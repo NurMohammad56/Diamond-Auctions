@@ -130,25 +130,103 @@ export const forgotPassword = async (req, res) => {
     }
 };
 
-// export const resetPassword = async (req, res) => {
-//     try {
-//         const { email, otp, newPassword } = req.body;
+// Verify otp
+export const verifyOtp = async (req, res) => {
+    try {
+        const { otp } = req.body;
 
-//         const user = await User.findOne({
-//             email,
-//             otp,
-//             otpExpires: { $gt: Date.now() },
-//         });
+        const user = await User.findOne({ otp });
 
-//         if (!user) return res.status(400).json({ message: 'Invalid or expired OTP' });
+        if (user.otp !== otp || new Date() > user.otpExpires) {
+            return res
+                .status(400)
+                .json({ status: false, message: "Invalid or expired OTP" });
+        }
 
-//         user.password = newPassword;
-//         user.otp = null;
-//         user.otpExpires = null;
-//         await user.save();
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
 
-//         res.status(200).json({ message: 'Password reset successful' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Password reset failed', error: err.message });
-//     }
-// };
+        return res.json({ status: true, message: "OTP verified successfully" });
+    } catch (error) {
+        console.log("Error in verifyOtp:", error);
+        return res.status(500).json({ status: false, message: error.message });
+    }
+};
+
+// Resend otp
+export const resendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                status: false,
+                message: "Email is required to resend OTP",
+            });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: "User not found",
+            });
+        }
+
+        const newOtp = generateOTP();
+        const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+        user.otp = newOtp;
+        user.otpExpires = otpExpires;
+        await user.save();
+
+        await sendMail({
+            to: user.email,
+            subject: 'Your Password Reset OTP',
+            text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+        });
+
+        return res.status(200).json({
+            status: true,
+            message: "OTP has been resent successfully",
+        });
+    } catch (error) {
+        return res.status(500).json({ status: false, message: error.message });
+    }
+};
+
+// Resett password
+export const resetPassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({
+                status: false,
+                message: "Old password and new password are required",
+            });
+        }
+
+        const user = await User.findOne();
+        if (!user)
+            return res.status(404).json({ status: false, message: "User not found" });
+
+        const isOldPasswordCorrect = await user.isValidPassword(oldPassword);
+        if (!isOldPasswordCorrect)
+            return res
+                .status(400)
+                .json({ status: false, message: "Old password is incorrect" });
+
+        user.password = newPassword;
+        await user.save();
+
+        // Send a success response
+        return res.status(200).json({
+            status: true,
+            message: "Password updated successfully",
+        });
+    } catch (error) {
+        return res.status(500).json({ status: false, message: error.message });
+    }
+};
