@@ -1,0 +1,89 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
+import cookieParser from 'cookie-parser';
+import compression from 'compression';
+
+import dbconfig from './src/configs/db.configs.js';
+
+// Load env vars
+dotenv.config({ path: './.env' });
+
+
+const app = express();
+
+// Enable CORS
+app.use(cors());
+
+// Set security HTTP headers
+app.use(helmet());
+
+// Limit requests from same API
+const limiter = rateLimit({
+    max: 100,
+    windowMs: 60 * 60 * 1000,
+    message: 'Too many requests from this IP, please try again in an hour!',
+});
+app.use('/api', limiter);
+
+// Body parser
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser());
+
+// Data sanitization 
+app.use(mongoSanitize());
+app.use(xss());
+
+// Compress all responses
+app.use(compression());
+
+// Route files
+import auctionRoutes from './routes/auction.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import userRoutes from './routes/user.routes.js';
+import bidRoutes from './routes/bid.routes.js';
+
+// Mount routers
+app.use('/api/v1/auctions', auctionRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/bids', bidRoutes);
+
+// Global error handler
+app.use(globalErrorHandler);
+
+const PORT = process.env.PORT || 5000;
+
+const server = app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+    console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+    console.log(err.name, err.message);
+    server.close(() => {
+        process.exit(1);
+    });
+});
+
+// Database and port
+dbconfig()
+    .then(() => {
+        app.on("error", (err) => {
+            console.log(`Error while listening on port: ${process.env.PORT}`, err);
+            throw err;
+        });
+
+        app.listen(process.env.PORT || 5003, () => {
+            console.log(`The server is listening on port ${process.env.PORT}`);
+        });
+    })
+    .catch((err) => {
+        console.log(`Error connecting to database`, err);
+        throw err;
+    });
