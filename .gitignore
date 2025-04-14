@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+
+# Environment variables
+
+
+# Logs
+*.log
+
+# Compiled TypeScript
+dist/
+
+# IDE settings
+.vscode/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
