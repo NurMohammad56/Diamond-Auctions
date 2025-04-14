@@ -103,32 +103,32 @@ export const logout = async (req, res) => {
     }
 };
 
+// Forget password
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
 
-// export const forgotPassword = async (req, res) => {
-//     try {
-//         const { email } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ status: false, message: 'User not found' });
 
-//         const user = await User.findOne({ email });
-//         if (!user) return res.status(404).json({ message: 'User not found' });
+        const otp = generateOTP();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
 
-//         const otp = generateOTP();
-//         const otpExpires = Date.now() + 10 * 60 * 1000;
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        await user.save();
 
-//         user.otp = otp;
-//         user.otpExpires = otpExpires;
-//         await user.save();
+        await sendMail({
+            to: user.email,
+            subject: 'Your Password Reset OTP',
+            text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+        });
 
-//         await sendMail({
-//             to: user.email,
-//             subject: 'Your Password Reset OTP',
-//             text: `Your OTP is ${otp}. It expires in 10 minutes.`,
-//         });
-
-//         res.status(200).json({ message: 'OTP sent to email' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Failed to send OTP', error: err.message });
-//     }
-// };
+        return res.status(200).json({ status: true, message: 'OTP sent to email' });
+    } catch (err) {
+        return res.status(500).json({ status: false, message: error.message });
+    }
+};
 
 // export const resetPassword = async (req, res) => {
 //     try {
