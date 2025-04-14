@@ -1,5 +1,4 @@
 import { User } from '../models/user.model.js';
-import jwt from 'jsonwebtoken';
 import { sendMail } from '../utilty/email.utility.js';
 import { generateOTP } from '../utilty/otp.utility.js'
 import { error } from 'console';
@@ -23,6 +22,7 @@ const generateAccessAndRefreshToken = async (userId) => {
     }
 };
 
+// User register
 export const register = async (req, res) => {
     try {
         const { username, email, password, confirmPassword } = req.body;
@@ -53,30 +53,31 @@ export const register = async (req, res) => {
     }
 };
 
-// export const login = async (req, res) => {
-//     try {
-//         const { username, password } = req.body;
+// User login
+export const login = async (req, res) => {
+    try {
+        const { username, password } = req.body;
 
-//         const user = await User.findOne({ username }).select('+password');
-//         if (!user || !(await user.isValidPassword(password))) {
-//             return res.status(400).json({ message: 'Invalid credentials' });
-//         }
+        const user = await User.findOne({ username }).select('+password');
+        if (!user || !(await user.isValidPassword(password))) {
+            return res.status(400).json({ status: false, message: 'Invalid credentials' });
+        }
 
-//         const accessToken = user.generateAccessToken();
-//         const refreshToken = user.generateRefreshToken();
+        const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
 
-//         user.refreshToken = refreshToken;
-//         await user.save();
+        user.refreshToken = refreshToken;
+        await user.save();
 
-//         res.status(200).json({
-//             message: 'Login successful',
-//             accessToken,
-//             refreshToken,
-//         });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Login failed', error: err.message });
-//     }
-// };
+        return res.status(200).json({
+            status: true,
+            message: 'Login successful',
+            accessToken,
+            refreshToken,
+        });
+    } catch (err) {
+        return res.status(500).json({ status: true, message: error.message });
+    }
+};
 
 // export const logout = async (req, res) => {
 //     try {
