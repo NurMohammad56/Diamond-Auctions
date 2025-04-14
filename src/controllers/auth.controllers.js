@@ -130,25 +130,26 @@ export const forgotPassword = async (req, res) => {
     }
 };
 
-// export const resetPassword = async (req, res) => {
-//     try {
-//         const { email, otp, newPassword } = req.body;
+// Verify otp
+export const verifyOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
 
-//         const user = await User.findOne({
-//             email,
-//             otp,
-//             otpExpires: { $gt: Date.now() },
-//         });
+    const user = await Auth.findOne({ otp });
 
-//         if (!user) return res.status(400).json({ message: 'Invalid or expired OTP' });
+    if (user.otp !== otp || new Date() > user.otpExpires) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid or expired OTP" });
+    }
 
-//         user.password = newPassword;
-//         user.otp = null;
-//         user.otpExpires = null;
-//         await user.save();
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
 
-//         res.status(200).json({ message: 'Password reset successful' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Password reset failed', error: err.message });
-//     }
-// };
+    return res.json({ status: true, message: "OTP verified successfully" });
+  } catch (error) {
+    console.log("Error in verifyOtp:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+};
