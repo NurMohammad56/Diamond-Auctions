@@ -79,25 +79,30 @@ export const login = async (req, res) => {
     }
 };
 
-// export const logout = async (req, res) => {
-//     try {
-//         const token = req.headers.authorization?.split(' ')[1];
+// User logout
+export const logout = async (req, res) => {
+    try {
+        const user = req.user;
 
-//         if (!token) return res.status(401).json({ message: 'Unauthorized' });
+        if (!user) {
+            return res
+                .status(400)
+                .json({ status: false, message: "User not found." });
+        }
 
-//         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-//         const user = await User.findById(decoded._id);
+        await User.findByIdAndUpdate(user._id, { refreshToken: null });
 
-//         if (user) {
-//             user.refreshToken = null;
-//             await user.save();
-//         }
+        return res
+            .status(200)
+            .json({ status: true, message: "Logged out successfully" });
+    } catch (error) {
+        return res.status(500).json({
+            status: false,
+            message: error.message,
+        });
+    }
+};
 
-//         res.status(200).json({ message: 'Logout successful' });
-//     } catch (err) {
-//         res.status(500).json({ message: 'Logout failed', error: err.message });
-//     }
-// };
 
 // export const forgotPassword = async (req, res) => {
 //     try {
