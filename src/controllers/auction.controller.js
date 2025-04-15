@@ -144,18 +144,18 @@ export const deleteAuction = async (req, res) => {
   }
 };
 
-// export const getAuctionBids = async (req, res) => {
-//   try {
-//     const bids = await Bid.find({ auction: req.params.id })
-//       .populate('user', 'username')
-//       .sort('-createdAt');
+export const getAuctionBids = async (req, res) => {
+  try {
+    const bids = await Bid.find({ auction: req.params.id })
+      .populate('user', 'username')
+      .sort('-createdAt');
 
-//     res.status(200).json({
-//       status: 'success',
-//       results: bids.length,
-//       data: { bids }
-//     });
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
+    res.status(200).json({
+      status: 'success',
+      results: bids.length,
+      data: { bids }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

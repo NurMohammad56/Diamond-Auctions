@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
+import http from 'http';
 
 import dbconfig from './src/configs/db.configs.js';
 
@@ -40,13 +41,13 @@ app.use(compression());
 import auctionRoutes from './src/routes/auction.routes.js';
 import authRoutes from './src/routes/auth.routes.js';
 // import userRoutes from './routes/user.routes.js';
-// import bidRoutes from './routes/bid.routes.js';
+import bidRoutes from './src/routes/bid.routes.js';
 
 // Mount routers
 app.use('/api/v1/auctions', auctionRoutes);
 app.use('/api/v1/auth', authRoutes);
 // app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/bids', bidRoutes);
+app.use('/api/v1/bids', bidRoutes);
 
 
 // Database and port
