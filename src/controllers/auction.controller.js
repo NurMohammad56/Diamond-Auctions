@@ -1,9 +1,26 @@
-import {Auction} from '../models/auction.models.js';
-import {Bid} from '../models/bid.models.js';
+import { Auction } from '../models/auction.models.js';
+import { Bid } from '../models/bid.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
- 
 
-export const createAuction = async (req, res) => {
+
+export const createAuctionData = async (req, res) => {
+  try {
+    const auction = await Auction.create({
+      ...req.body,
+      seller: req.user.id
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: auction
+    });
+  } catch (err) {
+    console.error("Error creating auction data:", err);
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const uploadAuctionImages = async (req, res) => {
   try {
     const imageUploadPromises = [];
 
@@ -17,18 +34,21 @@ export const createAuction = async (req, res) => {
 
     const imageUrls = uploadResults.map(result => result.secure_url);
 
-    const auction = await Auction.create({
-      ...req.body,
-      seller: req.user.id,
-      images: imageUrls
-    });
+    // Save the image URLs to the database
+    const auction = await Auction.findById(req.params.id);
+    if (!auction) {
+      return res.status(404).json({ error: 'Auction not found' });
+    }
 
-    res.status(201).json({
+    auction.images = auction.images ? auction.images.concat(imageUrls) : imageUrls;
+    await auction.save();
+
+    res.status(200).json({
       status: 'success',
-      data: auction
+      data: imageUrls
     });
   } catch (err) {
-    console.error("Error creating auction:", err);
+    console.error("Error uploading auction images:", err);
     res.status(400).json({ error: err.message });
   }
 };

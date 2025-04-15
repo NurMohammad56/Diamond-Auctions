@@ -34,7 +34,7 @@ const auctionSchema = new Schema({
   },
   reservePrice: {
     type: Number,
-    required: true,
+    default: false,    
   },
   reserveMet: {
     type: Boolean,
@@ -53,6 +53,10 @@ const auctionSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  approved: {
+    type: Boolean,
+    default: false,
   },
   status: {
     type: String,
