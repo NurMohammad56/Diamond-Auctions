@@ -39,7 +39,7 @@ export const uploadAuctionImages = async (req, res) => {
     // Save the image URLs to the database
     const auction = await Auction.findById(req.params.id);
     if (!auction) {
-      return res.status(404).json({ error: 'Auction not found' });
+      return res.status(404).json({ status: false, message: 'Auction not found' });
     }
 
     auction.images = auction.images ? auction.images.concat(imageUrls) : imageUrls;
@@ -84,61 +84,65 @@ export const getAllAuctions = async (req, res) => {
   }
 };
 
-// export const getAuction = async (req, res) => {
-//   try {
-//     const auction = await Auction.findById(req.params.id)
-//       .populate('seller', 'username');
+// Get a single auction
+export const getAuction = async (req, res) => {
+  try {
+    const auction = await Auction.findById(req.params.id)
+      .populate('seller', 'username');
 
-//     if (!auction) {
-//       return res.status(404).json({ error: 'Auction not found' });
-//     }
+    if (!auction) {
+      return res.status(404).json({ status: false, message: 'Auction not found' });
+    }
 
-//     res.status(200).json({
-//       status: 'success',
-//       data: { auction }
-//     });
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
+    res.status(200).json({
+      status: 'success',
+      data: { auction }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
 
-// export const updateAuction = async (req, res) => {
-//   try {
-//     const auction = await Auction.findByIdAndUpdate(
-//       req.params.id,
-//       req.body,
-//       { new: true, runValidators: true }
-//     );
+// Update an auction
+export const updateAuction = async (req, res) => {
+  try {
+    const auction = await Auction.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
 
-//     if (!auction) {
-//       return res.status(404).json({ error: 'Auction not found' });
-//     }
+    if (!auction) {
+      return res.status(404).json({ status: false, message: 'Auction not found' });
+    }
 
-//     res.status(200).json({
-//       status: 'success',
-//       data: { auction }
-//     });
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
+    return res.status(200).json({
+      status: 'success',
+      message: 'Auction updated successfully',
+      data: auction
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
 
-// export const deleteAuction = async (req, res) => {
-//   try {
-//     const auction = await Auction.findByIdAndDelete(req.params.id);
+// Delete an auction
+export const deleteAuction = async (req, res) => {
+  try {
+    const auction = await Auction.findByIdAndDelete(req.params.id);
 
-//     if (!auction) {
-//       return res.status(404).json({ error: 'Auction not found' });
-//     }
+    if (!auction) {
+      return res.status(404).json({status: false, message: 'Auction not found' });
+    }
 
-//     res.status(204).json({
-//       status: 'success',
-//       data: null
-//     });
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
+    return res.status(200).json({
+      status: 'success',
+      message: 'Auction deleted successfully',
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
 
 // export const getAuctionBids = async (req, res) => {
 //   try {
