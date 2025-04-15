@@ -12,4 +12,11 @@ const isUser = (req, res, next) => {
     }
     return res.status(403).json({ status: false, message: 'Access denied. User only.' });
 };
-export { isAdmin, isSupervisor, isUser };
+
+const isSeller = (req, res, next) => {
+    if (req.user && req.user.role === 'seller') {
+        return next();
+    }
+    return res.status(403).json({ status: false, message: 'Access denied. seller only.' });
+};
+export { isAdmin, isSeller, isUser };
