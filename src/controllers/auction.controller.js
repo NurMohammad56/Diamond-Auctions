@@ -3,6 +3,7 @@ import { Bid } from '../models/bid.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
 
 
+// Create a new auction
 export const createAuctionData = async (req, res) => {
   try {
     const auction = await Auction.create({
@@ -10,16 +11,17 @@ export const createAuctionData = async (req, res) => {
       seller: req.user.id
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       status: 'success',
       data: auction
     });
   } catch (err) {
     console.error("Error creating auction data:", err);
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 };
 
+// Upload auction images
 export const uploadAuctionImages = async (req, res) => {
   try {
     const imageUploadPromises = [];
@@ -43,32 +45,44 @@ export const uploadAuctionImages = async (req, res) => {
     auction.images = auction.images ? auction.images.concat(imageUrls) : imageUrls;
     await auction.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 'success',
       data: imageUrls
     });
   } catch (err) {
     console.error("Error uploading auction images:", err);
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 };
 
+// Get all auctions with pagination
+export const getAllAuctions = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
 
-// export const getAllAuctions = async (_, res) => {
-//   try {
-//     const auctions = await Auction.find()
-//       .populate('seller', 'username')
-//       .sort('-createdAt');
+    const auctions = await Auction.find()
+      .populate('seller', 'username')
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(limit);
 
-//     res.status(200).json({
-//       status: 'success',
-//       results: auctions.length,
-//       data: { auctions }
-//     });
-//   } catch (err) {
-//     res.status(400).json({ error: err.message });
-//   }
-// };
+    const totalAuctions = await Auction.countDocuments();
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Auctions retrieved successfully',
+      results: auctions.length,
+      total: totalAuctions,
+      page,
+      totalPages: Math.ceil(totalAuctions / limit),
+      data: auctions
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
 
 // export const getAuction = async (req, res) => {
 //   try {
