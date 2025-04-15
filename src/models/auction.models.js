@@ -60,13 +60,26 @@ const auctionSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['upcoming', 'live', 'completed', "latest", "popular", "highest bidding"],
+    enum: ['upcoming', 'live', 'completed'],
     default: 'upcoming',
   },
   sku: {
     type: String,
     unique: true,
     required: true,
+  },
+  winner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  bidHistoryVisibility: {
+    type: String,
+    enum: ['public', 'private'],
+    default: 'public'
+  },
+  requiresVerification: {
+    type: Boolean,
+    default: false
   },
   createdAt: {
     type: Date,
