@@ -1,0 +1,123 @@
+import Auction from '../models/Auction.model.js';
+import Bid from '../models/Bid.model.js';
+import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
+ 
+
+export const createAuction = async (req, res) => {
+  try {
+    const imageUploadPromises = [];
+
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        imageUploadPromises.push(uploadOnCloudinary(file.buffer));
+      }
+    }
+
+    const uploadResults = await Promise.all(imageUploadPromises);
+
+    const imageUrls = uploadResults.map(result => result.secure_url);
+
+    const auction = await Auction.create({
+      ...req.body,
+      seller: req.user.id,
+      images: imageUrls
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: auction
+    });
+  } catch (err) {
+    console.error("Error creating auction:", err);
+    res.status(400).json({ error: err.message });
+  }
+};
+
+
+// export const getAllAuctions = async (_, res) => {
+//   try {
+//     const auctions = await Auction.find()
+//       .populate('seller', 'username')
+//       .sort('-createdAt');
+
+//     res.status(200).json({
+//       status: 'success',
+//       results: auctions.length,
+//       data: { auctions }
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// };
+
+// export const getAuction = async (req, res) => {
+//   try {
+//     const auction = await Auction.findById(req.params.id)
+//       .populate('seller', 'username');
+
+//     if (!auction) {
+//       return res.status(404).json({ error: 'Auction not found' });
+//     }
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: { auction }
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// };
+
+// export const updateAuction = async (req, res) => {
+//   try {
+//     const auction = await Auction.findByIdAndUpdate(
+//       req.params.id,
+//       req.body,
+//       { new: true, runValidators: true }
+//     );
+
+//     if (!auction) {
+//       return res.status(404).json({ error: 'Auction not found' });
+//     }
+
+//     res.status(200).json({
+//       status: 'success',
+//       data: { auction }
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// };
+
+// export const deleteAuction = async (req, res) => {
+//   try {
+//     const auction = await Auction.findByIdAndDelete(req.params.id);
+
+//     if (!auction) {
+//       return res.status(404).json({ error: 'Auction not found' });
+//     }
+
+//     res.status(204).json({
+//       status: 'success',
+//       data: null
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// };
+
+// export const getAuctionBids = async (req, res) => {
+//   try {
+//     const bids = await Bid.find({ auction: req.params.id })
+//       .populate('user', 'username')
+//       .sort('-createdAt');
+
+//     res.status(200).json({
+//       status: 'success',
+//       results: bids.length,
+//       data: { bids }
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// };
