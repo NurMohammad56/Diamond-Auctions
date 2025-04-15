@@ -36,40 +36,22 @@ app.use(cookieParser());
 
 // Data sanitization 
 app.use(mongoSanitize());
-app.use(xss());
 
 // Compress all responses
 app.use(compression());
 
 // Route files
-import auctionRoutes from './routes/auction.routes.js';
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import bidRoutes from './routes/bid.routes.js';
+import auctionRoutes from './src/routes/auction.routes.js';
+import authRoutes from './src/routes/auth.routes.js';
+// import userRoutes from './routes/user.routes.js';
+// import bidRoutes from './routes/bid.routes.js';
 
 // Mount routers
 app.use('/api/v1/auctions', auctionRoutes);
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/bids', bidRoutes);
+// app.use('/api/v1/users', userRoutes);
+// app.use('/api/v1/bids', bidRoutes);
 
-// Global error handler
-app.use(globalErrorHandler);
-
-const PORT = process.env.PORT || 5000;
-
-const server = app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-    console.log('UNHANDLED REJECTION! 💥 Shutting down...');
-    console.log(err.name, err.message);
-    server.close(() => {
-        process.exit(1);
-    });
-});
 
 // Database and port
 dbconfig()

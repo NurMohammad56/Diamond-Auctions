@@ -1,7 +1,6 @@
 import { User } from '../models/user.model.js';
 import { sendMail } from '../utilty/email.utility.js';
 import { generateOTP } from '../utilty/otp.utility.js'
-import { error } from 'console';
 
 // generate token
 const generateAccessAndRefreshToken = async (userId) => {
@@ -25,9 +24,9 @@ const generateAccessAndRefreshToken = async (userId) => {
 // User register
 export const register = async (req, res) => {
     try {
-        const { username, email, password, confirmPassword } = req.body;
+        const { username, email, password, confirmPassword, role } = req.body;
 
-        if (!username || !email || !password || !confirmPassword) {
+        if (!username || !email || !password || !confirmPassword || !role) {
             return res.status(400).json({ status: false, message: 'All fields are required' });
         }
 
@@ -35,12 +34,16 @@ export const register = async (req, res) => {
             return res.status(400).json({ status: false, message: 'Passwords do not match' });
         }
 
+        if (!['bidder', 'seller'].includes(role)) {
+            return res.status(400).json({ status: false, message: 'Invalid role selected' });
+        }
+
         const existingUser = await User.findOne({ $or: [{ email }, { username }] });
         if (existingUser) {
             return res.status(400).json({ status: false, message: 'User already exists' });
         }
 
-        const newUser = await User.create({ username, email, password });
+        const newUser = await User.create({ username, email, password, role });
         await newUser.save();
 
         return res.status(201).json({
@@ -49,7 +52,7 @@ export const register = async (req, res) => {
             data: newUser
         });
     } catch (err) {
-        return res.status(500).json({ status: false, message: error.message, });
+        return res.status(500).json({ status: false, message: err.message });
     }
 };
 

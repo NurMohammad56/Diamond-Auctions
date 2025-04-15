@@ -1,5 +1,5 @@
-import Auction from '../models/Auction.model.js';
-import Bid from '../models/Bid.model.js';
+import {Auction} from '../models/auction.models.js';
+import {Bid} from '../models/bid.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
  
 
