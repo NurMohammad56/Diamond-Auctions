@@ -109,9 +109,11 @@ export const getBid = async (req, res) => {
 // Get all bids for an auction
 export const getBidsForAuction = async (req, res) => {
     try {
+        console.log("Auction ID:", req.params.auctionId); // Log the ID
         const bids = await Bid.find({ auction: req.params.auctionId })
             .populate('user', 'username')
-            .sort('-createdAt')
+            .sort('-createdAt');
+        console.log("Found bids:", bids); // Log the result
         if (!bids || bids.length === 0) {
             return res.status(404).json({ status: false, message: 'No bids found for this auction' });
         }
@@ -120,10 +122,9 @@ export const getBidsForAuction = async (req, res) => {
             message: 'Bids retrieved successfully',
             results: bids.length,
             data: bids
-        })
-
-    }
-    catch (err) {
+        });
+    } catch (err) {
+        console.error("Error:", err); // Log the error
         return res.status(400).json({ status: false, message: err.message });
     }
 };

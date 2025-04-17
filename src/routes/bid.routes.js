@@ -13,7 +13,7 @@ const router = express.Router();
 router.post('/auctions/:auctionId/bid',verifyJWT, placeBid);
 router.get('/users/:userId/bid', verifyJWT, getUserBids);   
 router.get('/:id/bid', verifyJWT, getBid);
-router.get('/:auctionId/bid', verifyJWT, getBidsForAuction);
-router.get('/:auctionId/bid', verifyJWT, getBidsHistory);
+router.get('/:auctionId', verifyJWT, getBidsForAuction);
+router.get('/:auctionId/bidHistory', verifyJWT, getBidsHistory);
 
 export default router;
