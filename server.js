@@ -41,6 +41,7 @@ app.use(compression());
 import auctionRoutes from './src/routes/auction.routes.js';
 import authRoutes from './src/routes/auth.routes.js';
 // import userRoutes from './routes/user.routes.js';
+import wishlistRoutes from './src/routes/wishlist.routes.js';
 import bidRoutes from './src/routes/bid.routes.js';
 
 // Mount routers
@@ -48,6 +49,7 @@ app.use('/api/v1/auctions', auctionRoutes);
 app.use('/api/v1/auth', authRoutes);
 // app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bids', bidRoutes);
+app.use('/api/v1/wishlist', wishlistRoutes);
 
 
 // Database and port
