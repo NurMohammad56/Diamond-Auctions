@@ -109,22 +109,31 @@ export const getBid = async (req, res) => {
 // Get all bids for an auction
 export const getBidsForAuction = async (req, res) => {
     try {
-        console.log("Auction ID:", req.params.auctionId); // Log the ID
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
         const bids = await Bid.find({ auction: req.params.auctionId })
             .populate('user', 'username')
-            .sort('-createdAt');
-        console.log("Found bids:", bids); // Log the result
+            .sort('-createdAt')
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const totalBids = await Bid.countDocuments({ auction: req.params.auctionId });
+
         if (!bids || bids.length === 0) {
             return res.status(404).json({ status: false, message: 'No bids found for this auction' });
         }
+
         return res.status(200).json({
             status: true,
             message: 'Bids retrieved successfully',
             results: bids.length,
+            total: totalBids,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalBids / limit),
             data: bids
         });
     } catch (err) {
-        console.error("Error:", err); // Log the error
         return res.status(400).json({ status: false, message: err.message });
     }
 };
@@ -132,10 +141,17 @@ export const getBidsForAuction = async (req, res) => {
 // Get bids history for an auction
 export const getBidsHistory = async (req, res) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
         const bids = await Bid.find({ auction: req.params.auctionId })
             .populate('user', 'username')
             .sort('-createdAt')
-            .select('amount user createdAt isAuto');
+            .select('amount user createdAt isAuto startingBid currentBid bidIncrement')
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const totalBids = await Bid.countDocuments({ auction: req.params.auctionId });
 
         if (!bids || bids.length === 0) {
             return res.status(404).json({ status: false, message: 'No bids found for this auction' });
@@ -145,6 +161,9 @@ export const getBidsHistory = async (req, res) => {
             status: true,
             message: 'Bids retrieved successfully',
             results: bids.length,
+            total: totalBids,
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalBids / limit),
             data: bids
         });
     } catch (err) {
