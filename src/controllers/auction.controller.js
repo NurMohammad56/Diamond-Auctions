@@ -132,7 +132,7 @@ export const deleteAuction = async (req, res) => {
     const auction = await Auction.findByIdAndDelete(req.params.id);
 
     if (!auction) {
-      return res.status(404).json({status: false, message: 'Auction not found' });
+      return res.status(404).json({ status: false, message: 'Auction not found' });
     }
 
     return res.status(200).json({
@@ -144,18 +144,74 @@ export const deleteAuction = async (req, res) => {
   }
 };
 
-export const getAuctionBids = async (req, res) => {
+// Search auctions
+export const searchAuctions = async (req, res) => {
   try {
-    const bids = await Bid.find({ auction: req.params.id })
-      .populate('user', 'username')
-      .sort('-createdAt');
+    const { category, caratWeight, timeRange, typeOfSales, searchQuery } = req.query;
+    const filter = {}; 
 
-    res.status(200).json({
-      status: 'success',
-      results: bids.length,
-      data: { bids }
+    if (category) {
+      filter.category = { $in: category.split(',') };
+    }
+    if (caratWeight) {
+      const ranges = {
+        'under-0.50': { $lt: 0.5 },
+        '0.50-1.00': { $gte: 0.5, $lt: 1.0 },
+        '1.00-2.00': { $gte: 1.0, $lt: 2.0 },
+        '2.00-3.00': { $gte: 2.0, $lt: 3.0 },
+        '3.00-plus': { $gte: 3.0 }
+      };
+      filter.caratWeight = ranges[caratWeight];
+    }
+    if (timeRange) {
+      const now = new Date();
+      const dateRanges = {
+        'today': { $gte: new Date(now.setHours(0, 0, 0, 0)) },
+        'yesterday': {
+          $gte: new Date(new Date().setDate(now.getDate() - 1)),
+          $lt: new Date(now.setHours(0, 0, 0, 0))
+        },
+        'last-7-days': { $gte: new Date(now.setDate(now.getDate() - 7)) },
+        'last-30-days': { $gte: new Date(now.setDate(now.getDate() - 30)) }
+      };
+      filter.createdAt = dateRanges[timeRange];
+    }
+    if (typeOfSales) {
+      switch (typeOfSales) {
+        case 'upcoming':
+          filter.status = 'upcoming';
+          filter.startTime = { $gt: new Date() };
+          break;
+        case 'latest':
+          filter.status = 'live';
+          filter.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+          break;
+        case 'live-auction':
+          filter.status = 'live';
+          break;
+        case 'popular':
+          filter.bidCount = { $gt: 5 };
+          break;
+        case 'highest-bidding':
+          filter.currentBid = { $gt: 10000 };
+          break;
+      }
+    }
+    if (searchQuery) {
+      filter.$text = { $search: searchQuery };
+    }
+
+    const auctions = await Auction.find(filter)
+      .sort('-createdAt')
+      .populate('seller', 'username');
+
+    return res.status(200).json({
+      status: true,
+      message: "Success",
+      results: auctions.length,
+      data: auctions
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ status: false, message: err.message });
   }
 };

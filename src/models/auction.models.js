@@ -1,72 +1,65 @@
-import mongoose, {Schema} from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const auctionSchema = new Schema({
   title: {
     type: String,
     required: true,
-    trim: true,
+    trim: true
   },
-  description: {
-    type: String,
-    required: true,
-  },
+  description: String,
   category: {
     type: String,
-    required: true,
-    enum: ['round', 'princess', 'emerald', 'asscher', "oval", "marquise"],
+    enum: ['round', 'princess', 'emerald', 'asscher', 'oval', 'marquise'],
+    required: true
   },
   caratWeight: {
-    type: String,
+    type: Number,
+    required: true
   },
   startingBid: {
     type: Number,
-    required: true,
-    min: 0,
+    required: true
   },
   currentBid: {
     type: Number,
-    default: 0,
+    default: 0
   },
   bidIncrement: {
     type: Number,
-    required: true,
-    min: 1,
+    required: true 
   },
   reservePrice: {
     type: Number,
-    default: false,    
+    required: true 
   },
   reserveMet: {
     type: Boolean,
-    default: false,
+    default: false
   },
-  images: [String],
-  startTime: {
-    type: Date,
-    default: Date.now,
-  },
-  endTime: {
-    type: Date,
-    required: true,
-  },
-  seller: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  approved: {
-    type: Boolean,
-    default: false,
+  bidCount: {
+    type: Number,
+    default: 0
   },
   status: {
     type: String,
-    enum: ['upcoming', 'live', 'completed'],
-    default: 'upcoming',
+    enum: ['upcoming', 'live', 'completed', 'latest'],
+    default: 'upcoming'
+  },
+  startTime: Date,
+  endTime: Date,
+  seller: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  approved: {
+    type: Boolean,
+    default: false
   },
   sku: {
     type: String,
     unique: true,
-    required: true,
+    required: true
   },
   winner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -81,17 +74,24 @@ const auctionSchema = new Schema({
     type: Boolean,
     default: false
   },
+  images: [{
+    type: String
+  }],
   createdAt: {
     type: Date,
-    default: Date.now,
-  },
+    default: Date.now
+  }
 });
 
-// Virtual populate bids
 auctionSchema.virtual('bids', {
   ref: 'Bid',
   foreignField: 'auction',
-  localField: '_id',
+  localField: '_id'
+});
+
+auctionSchema.index({
+  title: 'text',
+  description: 'text'
 });
 
 export const Auction = mongoose.model('Auction', auctionSchema);

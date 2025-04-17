@@ -4,51 +4,69 @@ import { Auction } from '../models/auction.models.js';
 // Create a new bid
 export const placeBid = async (req, res) => {
     try {
-        const auction = await Auction.findById(req.params.auctionId);
-
-        if (!auction) {
-            return res.status(404).json({ status: false, message: 'Auction not found' });
-        }
-
-        // Check if auction is still active
-        if (auction.endTime < new Date()) {
-            return res.status(400).json({ status: false, message: 'Auction has ended' });
-        }
-
-        // Check bid amount
-        if (req.body.amount <= auction.currentBid) {
-            return res.status(400).json({
-                status: false, message: `Bid must be higher than current bid of $${auction.currentBid}`
-            });
-        }
-
-        // Create bid
-        const bid = await Bid.create({
-            amount: req.body.amount,
-            auction: req.params.auctionId,
-            user: req.user.id
+      // Find the auction
+      const auction = await Auction.findById(req.params.auctionId);
+  
+      if (!auction) {
+        return res.status(404).json({ status: false, message: 'Auction not found' });
+      }
+  
+      // Check if auction is active
+      if (auction.status !== 'live' || auction.endTime < new Date()) {
+        return res.status(400).json({ status: false, message: 'Auction is not active or has ended' });
+      }
+  
+      // Validate bid amount
+      const { amount } = req.body;
+      if (!amount || typeof amount !== 'number' || amount <= 0) {
+        return res.status(400).json({ status: false, message: 'Invalid bid amount' });
+      }
+  
+      // Check if bid is higher than current bid and respects bid increment
+      const minimumBid = auction.currentBid
+        ? auction.currentBid + auction.bidIncrement
+        : auction.startingBid;
+      if (amount < minimumBid) {
+        return res.status(400).json({
+          status: false,
+          message: `Bid must be at least $${minimumBid}`
         });
-
-        // Update auction
-        auction.currentBid = req.body.amount;
-
-        // Check if reserve price is met
-        if (req.body.amount >= auction.reservePrice) {
-            auction.reserveMet = true;
-        }
-
-        await auction.save();
-
-        return res.status(201).json({
-            status: 'success',
-            message: 'Bid placed successfully',
-            data: bid
-        });
+      }
+  
+      // Create bid
+      const bid = await Bid.create({
+        amount,
+        auction: req.params.auctionId,
+        user: req.user.id,
+        createdAt: new Date()
+      });
+  
+      // Update auction atomically
+      await Auction.findOneAndUpdate(
+        { _id: req.params.auctionId },
+        {
+          $set: {
+            currentBid: amount,
+            reserveMet: amount >= auction.reservePrice,
+          },
+          $inc: { bidCount: 1 }
+        },
+        { new: true }
+      );
+  
+      const populatedBid = await Bid.findById(bid._id)
+        .populate('user', 'username')
+        .populate('auction', 'title');
+  
+      return res.status(201).json({
+        status: 'success',
+        message: 'Bid placed successfully',
+        data: populatedBid
+      });
     } catch (err) {
-        return res.status(400).json({ status: false, message: err.message });
+      return res.status(400).json({ status: false, message: err.message });
     }
-};
-
+  };
 // Get all bids for a user
 export const getUserBids = async (req, res) => {
     try {
@@ -60,10 +78,10 @@ export const getUserBids = async (req, res) => {
             status: true,
             message: 'Bids retrieved successfully',
             results: bids.length,
-            data:  bids 
+            data: bids
         });
     } catch (err) {
-        return res.status(400).json({status: false, message: err.message });
+        return res.status(400).json({ status: false, message: err.message });
     }
 };
 
@@ -75,13 +93,58 @@ export const getBid = async (req, res) => {
             .populate('auction', 'title');
 
         if (!bid) {
-            return res.status(404).json({status: false, message: 'Bid not found' });
+            return res.status(404).json({ status: false, message: 'Bid not found' });
         }
 
         return res.status(200).json({
             status: true,
             message: 'Bid retrieved successfully',
-            data:  bid 
+            data: bid
+        });
+    } catch (err) {
+        return res.status(400).json({ status: false, message: err.message });
+    }
+};
+
+// Get all bids for an auction
+export const getBidsForAuction = async (req, res) => {
+    try {
+        const bids = await Bid.find({ auction: req.params.auctionId })
+            .populate('user', 'username')
+            .sort('-createdAt')
+        if (!bids || bids.length === 0) {
+            return res.status(404).json({ status: false, message: 'No bids found for this auction' });
+        }
+        return res.status(200).json({
+            status: true,
+            message: 'Bids retrieved successfully',
+            results: bids.length,
+            data: bids
+        })
+
+    }
+    catch (err) {
+        return res.status(400).json({ status: false, message: err.message });
+    }
+};
+
+// Get bids history for an auction
+export const getBidsHistory = async (req, res) => {
+    try {
+        const bids = await Bid.find({ auction: req.params.auctionId })
+            .populate('user', 'username')
+            .sort('-createdAt')
+            .select('amount user createdAt isAuto');
+
+        if (!bids || bids.length === 0) {
+            return res.status(404).json({ status: false, message: 'No bids found for this auction' });
+        }
+
+        return res.status(200).json({
+            status: true,
+            message: 'Bids retrieved successfully',
+            results: bids.length,
+            data: bids
         });
     } catch (err) {
         return res.status(400).json({ status: false, message: err.message });
