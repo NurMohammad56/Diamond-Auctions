@@ -1,6 +1,7 @@
 import { Bid } from '../models/bid.models.js';
 import { Auction } from '../models/auction.models.js';
 
+// Create a new bid
 export const placeBid = async (req, res) => {
     try {
         const auction = await Auction.findById(req.params.auctionId);
@@ -48,6 +49,7 @@ export const placeBid = async (req, res) => {
     }
 };
 
+// Get all bids for a user
 export const getUserBids = async (req, res) => {
     try {
         const bids = await Bid.find({ user: req.user.id })
@@ -65,21 +67,23 @@ export const getUserBids = async (req, res) => {
     }
 };
 
-// export const getBid = async (req, res) => {
-//     try {
-//         const bid = await Bid.findById(req.params.id)
-//             .populate('user', 'username')
-//             .populate('auction', 'title');
+// Get a bid
+export const getBid = async (req, res) => {
+    try {
+        const bid = await Bid.findById(req.params.id)
+            .populate('user', 'username')
+            .populate('auction', 'title');
 
-//         if (!bid) {
-//             return res.status(404).json({ error: 'Bid not found' });
-//         }
+        if (!bid) {
+            return res.status(404).json({status: false, message: 'Bid not found' });
+        }
 
-//         res.status(200).json({
-//             status: 'success',
-//             data: { bid }
-//         });
-//     } catch (err) {
-//         res.status(400).json({ error: err.message });
-//     }
-// };
+        return res.status(200).json({
+            status: true,
+            message: 'Bid retrieved successfully',
+            data:  bid 
+        });
+    } catch (err) {
+        return res.status(400).json({ status: false, message: err.message });
+    }
+};
