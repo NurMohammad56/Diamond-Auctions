@@ -48,21 +48,22 @@ export const placeBid = async (req, res) => {
     }
 };
 
-// export const getUserBids = async (req, res) => {
-//     try {
-//         const bids = await Bid.find({ user: req.user.id })
-//             .populate('auction', 'title currentBid endTime')
-//             .sort('-createdAt');
+export const getUserBids = async (req, res) => {
+    try {
+        const bids = await Bid.find({ user: req.user.id })
+            .populate('auction', 'title currentBid endTime')
+            .sort('-createdAt');
 
-//         res.status(200).json({
-//             status: 'success',
-//             results: bids.length,
-//             data: { bids }
-//         });
-//     } catch (err) {
-//         res.status(400).json({ error: err.message });
-//     }
-// };
+        return res.status(200).json({
+            status: true,
+            message: 'Bids retrieved successfully',
+            results: bids.length,
+            data:  bids 
+        });
+    } catch (err) {
+        return res.status(400).json({status: false, message: err.message });
+    }
+};
 
 // export const getBid = async (req, res) => {
 //     try {
