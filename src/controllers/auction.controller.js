@@ -148,7 +148,7 @@ export const deleteAuction = async (req, res) => {
 export const searchAuctions = async (req, res) => {
   try {
     const { category, caratWeight, timeRange, typeOfSales, searchQuery } = req.query;
-    const filter = {}; 
+    const filter = {};
 
     if (category) {
       filter.category = { $in: category.split(',') };
@@ -212,6 +212,26 @@ export const searchAuctions = async (req, res) => {
       data: auctions
     });
   } catch (err) {
+    return res.status(400).json({ status: false, message: err.message });
+  }
+};
+
+// Get all related auction for same category
+export const getRelatedAuctions = async (req, res) => {
+  try {
+    const { category } = req.query;
+    const auctions = await Auction.find({ category })
+      .sort('-createdAt')
+      .populate('seller', 'username');
+    return res.status(200).json({
+      status: true,
+      message: "Success",
+      results: auctions.length,
+      data: auctions
+    });
+
+  }
+  catch (err) {
     return res.status(400).json({ status: false, message: err.message });
   }
 };
