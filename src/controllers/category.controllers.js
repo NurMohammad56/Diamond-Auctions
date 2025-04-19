@@ -22,13 +22,13 @@ export const createCategory = async (req, res) => {
         let imageUrl = null;
         if (req.file) {
             const uploadResult = await uploadOnCloudinary(req.file.buffer);
-            imageUrl = uploadResult.secure_url; // Extract the secure URL
+            imageUrl = uploadResult.secure_url;
         }
 
         const category = await Category.create({
             name,
             description,
-            image: imageUrl, // Save the URL as a string
+            image: imageUrl,
             createdBy: req.user.id
         });
 
@@ -49,42 +49,42 @@ export const updateCategory = async (req, res) => {
         const { categoryId } = req.params;
         const { name, description } = req.body;
 
-        // Validate input
-        if (!name) {
-            return res.status(400).json({ status: false, message: 'Category name is required' });
+        // Check if categoryId is valid
+        if (!categoryId) {
+            return res.status(400).json({ status: false, message: 'Category ID is required' });
         }
 
-        // Handle file upload
-        let imageUrl = null;
-        if (req.file) {
-            imageUrl = await uploadFile(req.file.buffer);
-        }
-
-        // Find and update category
-        const updateData = {
-            name,
-            description,
-            updatedAt: new Date()
-        };
-
-        if (imageUrl) {
-            updateData.imageUrl = imageUrl;
-        }
-
-        const category = await Category.findByIdAndUpdate(
-            categoryId,
-            updateData,
-            { new: true, runValidators: true }
-        );
-
+        // Find the category first
+        const category = await Category.findById(categoryId);
         if (!category) {
             return res.status(404).json({ status: false, message: 'Category not found' });
         }
 
+        // Validate input
+        if (!name && !description && !req.file) {
+            return res.status(400).json({
+                status: false,
+                message: 'At least one of name, description, or image is required for update',
+            });
+        }
+
+        // Handle image upload
+        if (req.file) {
+            const uploadResult = await uploadOnCloudinary(req.file.buffer);
+            category.imageUrl = uploadResult.secure_url;
+        }
+
+        // Only update fields that are provided
+        if (name) category.name = name;
+        if (description) category.description = description;
+        category.updatedAt = new Date();
+
+        const updatedCategory = await category.save();
+
         return res.status(200).json({
             status: true,
             message: 'Category updated successfully',
-            data: category
+            data: updatedCategory,
         });
     } catch (err) {
         console.error('Error in updateCategory:', err.message);
@@ -144,37 +144,37 @@ export const getAllCategories = async (req, res) => {
 // Get all categories with their auctions
 export const getCategoriesWithAuctions = async (req, res) => {
     try {
-      const categories = await Category.find()
-        .sort('name')
-        .select('name description');
-  
-      // Fetch auctions for each category
-      const categoriesWithAuctions = await Promise.all(
-        categories.map(async (category) => {
-          const auctions = await Auction.find({ category: category._id })
-            .populate('category', 'name')
-            .populate('seller', 'username')
-            .select('title description caratWeight currentBid status startTime endTime')
-            .sort('-createdAt');
-  
-          return {
-            _id: category._id,
-            name: category.name,
-            description: category.description,
-            auctions: auctions
-          };
-        })
-      );
-  
-      return res.status(200).json({
-        status: true,
-        message: 'Categories with auctions retrieved successfully',
-        results: categoriesWithAuctions.length,
-        data: categoriesWithAuctions
-      });
+        const categories = await Category.find()
+            .sort('name')
+            .select('name description');
+
+        // Fetch auctions for each category
+        const categoriesWithAuctions = await Promise.all(
+            categories.map(async (category) => {
+                const auctions = await Auction.find({ category: category._id })
+                    .populate('category', 'name')
+                    .populate('seller', 'username')
+                    .select('title description caratWeight currentBid status startTime endTime')
+                    .sort('-createdAt');
+
+                return {
+                    _id: category._id,
+                    name: category.name,
+                    description: category.description,
+                    auctions: auctions
+                };
+            })
+        );
+
+        return res.status(200).json({
+            status: true,
+            message: 'Categories with auctions retrieved successfully',
+            results: categoriesWithAuctions.length,
+            data: categoriesWithAuctions
+        });
     } catch (err) {
-      console.error('Error in getCategoriesWithAuctions:', err.message);
-      return res.status(400).json({ status: false, message: err.message });
+        console.error('Error in getCategoriesWithAuctions:', err.message);
+        return res.status(400).json({ status: false, message: err.message });
     }
 
 }
