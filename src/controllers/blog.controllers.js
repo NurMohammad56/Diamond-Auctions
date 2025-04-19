@@ -41,13 +41,24 @@ export const createBlog = async (req, res) => {
 };
 
 // Get All Blog Posts
-export const getBlogs = async (_, res) => {
+export const getBlogs = async (req, res) => {
     try {
-        const blogs = await Blog.find().sort({ createdAt: -1 });
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
+        const blogs = await Blog.find()
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const totalBlogs = await Blog.countDocuments();
+
         return res.status(200).json({
             status: true,
             message: 'Blog posts retrieved successfully',
             results: blogs.length,
+            totalPages: Math.ceil(totalBlogs / limit),
+            currentPage: parseInt(page),
             data: blogs,
         });
     } catch (err) {
