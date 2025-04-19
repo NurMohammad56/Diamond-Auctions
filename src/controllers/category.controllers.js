@@ -1,3 +1,4 @@
+import { Auction } from '../models/auction.models.js';
 import { Category } from '../models/category.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js'; // Assuming you have a file upload utility
 

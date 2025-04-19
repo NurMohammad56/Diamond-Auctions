@@ -18,7 +18,7 @@ router.put('/update/:categoryId', verifyJWT, isAdmin, updateCategory);
 router.delete('/delate/:categoryId', verifyJWT, isAdmin, deleteCategory); 
 
 // Public route (for sellers and others)
-router.get('/', getAllCategories); 
+router.get('/all', getAllCategories); 
 router.get('/with-auctions', getCategoriesWithAuctions);
 
 export default router;
