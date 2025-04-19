@@ -13,7 +13,7 @@ router.put("/update/:id", verifyJWT, isAdmin, upload.single("image"), updateBlog
 router.delete("/delete/:id", verifyJWT, isAdmin, deleteBlog);
 router.post("/add-comment/:id", verifyJWT, addComment);
 router.get("/get-comment/:id", verifyJWT, isAdmin, getComments);    
-router.delete("/comment/:id/:commentId", verifyJWT, isAdmin, deleteComment);
+router.delete("/delete/:id/:commentId", verifyJWT, isAdmin, deleteComment);
 
 
 export default router;
