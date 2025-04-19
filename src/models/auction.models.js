@@ -26,24 +26,28 @@ const auctionSchema = new Schema({
   },
   bidIncrement: {
     type: Number,
-    required: true 
+    required: true
   },
   reservePrice: {
     type: Number,
-    required: true 
+    required: true
   },
   reserveMet: {
     type: Boolean,
     default: false
   },
-  bidCount: {
-    type: Number,
-    default: 0
-  },
   status: {
     type: String,
     enum: ['upcoming', 'live', 'completed', 'latest'],
     default: 'upcoming'
+  },
+  winner: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  bidCount: {
+    type: Number,
+    default: 0
   },
   startTime: Date,
   endTime: Date,
@@ -60,10 +64,6 @@ const auctionSchema = new Schema({
     type: String,
     unique: true,
     required: true
-  },
-  winner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
   },
   bidHistoryVisibility: {
     type: String,

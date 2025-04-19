@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import './src/utilty/auctions.cron.utility.js'
 
 import dbconfig from './src/configs/db.configs.js';
 
