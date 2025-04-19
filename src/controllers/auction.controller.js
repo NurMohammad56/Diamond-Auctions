@@ -166,7 +166,7 @@ export const searchAuctions = async (req, res) => {
     const filter = {};
 
     if (category) {
-      const categoryNames = category.split(',').map(name => name.trim());
+      const categoryNames = category.trim();
       const categoryDocs = await Category.find({ name: { $in: categoryNames } });
 
       if (categoryDocs.length === 0) {

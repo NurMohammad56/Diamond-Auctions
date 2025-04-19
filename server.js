@@ -5,7 +5,8 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
-import http from 'http';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 import dbconfig from './src/configs/db.configs.js';
 
@@ -14,6 +15,13 @@ dotenv.config({ path: './.env' });
 
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        origin: '*', 
+        methods: ['GET', 'POST']
+    }
+});
 
 // Enable CORS
 app.use(cors());
@@ -30,8 +38,8 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Body parser
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json());
+app.use(express.urlencoded());
 app.use(cookieParser());
 
 // Compress all responses
@@ -40,19 +48,42 @@ app.use(compression());
 // Route files
 import auctionRoutes from './src/routes/auction.routes.js';
 import authRoutes from './src/routes/auth.routes.js';
-// import userRoutes from './routes/user.routes.js';
 import wishlistRoutes from './src/routes/wishlist.routes.js';
 import bidRoutes from './src/routes/bid.routes.js';
-import  categoryRoutes from './src/routes/category.routes.js';
+import categoryRoutes from './src/routes/category.routes.js';
+// import userRoutes from './routes/user.routes.js';
 
 // Mount routers
 app.use('/api/v1/auctions', auctionRoutes);
 app.use('/api/v1/auth', authRoutes);
-// app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/bids', bidRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/admin/categories', categoryRoutes);
+// app.use('/api/v1/users', userRoutes);
 
+
+// Socket.IO connection
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    // Join auction room
+    socket.on('joinAuction', (auctionId) => {
+        socket.join(auctionId);
+        console.log(`Client ${socket.id} joined auction ${auctionId}`);
+    });
+
+    // Leave auction room
+    socket.on('leaveAuction', (auctionId) => {
+        socket.leave(auctionId);
+        console.log(`Client ${socket.id} left auction ${auctionId}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
+export { io };
 
 
 // Database and port
