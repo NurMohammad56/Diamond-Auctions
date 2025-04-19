@@ -1,25 +1,40 @@
 import { Auction } from '../models/auction.models.js';
-import { Bid } from '../models/bid.models.js';
+import { Category } from '../models/category.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
 
 
 // Create a new auction
 export const createAuctionData = async (req, res) => {
   try {
+    const { categoryId, ...rest } = req.body;
+
+    // Validate category exists
+    const categoryDoc = await Category.findById(categoryId);
+    if (!categoryDoc) {
+      return res.status(400).json({ status: false, message: 'Invalid category ID' });
+    }
+
     const auction = await Auction.create({
-      ...req.body,
+      ...rest,
+      category: categoryDoc._id,
       seller: req.user.id
     });
 
+    // Populate category and seller in response
+    const populatedAuction = await Auction.findById(auction._id)
+      .populate('category', 'name')
+      .populate('seller', 'username');
+
     return res.status(201).json({
       status: 'success',
-      data: auction
+      data: populatedAuction
     });
   } catch (err) {
-    console.error("Error creating auction data:", err);
-    return res.status(400).json({ error: err.message });
+    console.error('Error creating auction data:', err.message);
+    return res.status(400).json({ status: false, message: err.message });
   }
 };
+
 
 // Upload auction images
 export const uploadAuctionImages = async (req, res) => {
@@ -151,8 +166,17 @@ export const searchAuctions = async (req, res) => {
     const filter = {};
 
     if (category) {
-      filter.category = { $in: category.split(',') };
+      const categoryNames = category.split(',').map(name => name.trim());
+      const categoryDocs = await Category.find({ name: { $in: categoryNames } });
+
+      if (categoryDocs.length === 0) {
+        return res.status(404).json({ status: false, message: 'No matching categories found' });
+      }
+
+      const categoryIds = categoryDocs.map(cat => cat._id);
+      filter.category = { $in: categoryIds };
     }
+
     if (caratWeight) {
       const ranges = {
         'under-0.50': { $lt: 0.5 },
@@ -163,6 +187,7 @@ export const searchAuctions = async (req, res) => {
       };
       filter.caratWeight = ranges[caratWeight];
     }
+
     if (timeRange) {
       const now = new Date();
       const dateRanges = {
@@ -176,6 +201,7 @@ export const searchAuctions = async (req, res) => {
       };
       filter.createdAt = dateRanges[timeRange];
     }
+
     if (typeOfSales) {
       switch (typeOfSales) {
         case 'upcoming':
@@ -197,22 +223,26 @@ export const searchAuctions = async (req, res) => {
           break;
       }
     }
+
     if (searchQuery) {
       filter.$text = { $search: searchQuery };
     }
 
     const auctions = await Auction.find(filter)
       .sort('-createdAt')
+      .populate('category', 'name')
       .populate('seller', 'username');
 
     return res.status(200).json({
       status: true,
-      message: "Success",
+      message: 'Success',
       results: auctions.length,
       data: auctions
     });
+
   } catch (err) {
-    return res.status(400).json({ status: false, message: err.message });
+    console.error('Error in searchAuctions:', err.message);
+    return res.status(500).json({ status: false, message: 'Server error' });
   }
 };
 
@@ -220,18 +250,32 @@ export const searchAuctions = async (req, res) => {
 export const getRelatedAuctions = async (req, res) => {
   try {
     const { category } = req.query;
-    const auctions = await Auction.find({ category })
+
+    if (!category) {
+      return res.status(400).json({ status: false, message: 'Category name is required in query' });
+    }
+
+    // Find the category by its name
+    const categoryDoc = await Category.findOne({ name: category.trim() });
+    if (!categoryDoc) {
+      return res.status(404).json({ status: false, message: 'Category not found with given name' });
+    }
+
+    // Now find auctions with the found category ID
+    const auctions = await Auction.find({ category: categoryDoc._id })
       .sort('-createdAt')
+      .populate('category', 'name')
       .populate('seller', 'username');
+
     return res.status(200).json({
       status: true,
-      message: "Success",
+      message: 'Success',
       results: auctions.length,
       data: auctions
     });
 
-  }
-  catch (err) {
-    return res.status(400).json({ status: false, message: err.message });
+  } catch (err) {
+    console.error('Error in getRelatedAuctions:', err.message);
+    return res.status(500).json({ status: false, message: 'Server error' });
   }
 };

@@ -8,8 +8,8 @@ const auctionSchema = new Schema({
   },
   description: String,
   category: {
-    type: String,
-    enum: ['round', 'princess', 'emerald', 'asscher', 'oval', 'marquise'],
+    type: Schema.Types.ObjectId,
+    ref: 'Category',
     required: true
   },
   caratWeight: {
