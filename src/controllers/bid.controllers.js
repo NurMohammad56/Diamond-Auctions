@@ -4,9 +4,10 @@ import { AutoBid } from '../models/autobidding.models.js';
 import { io } from '../../server.js';
 
 // Helper function to process automated bids
-const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUserId) => {
+const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUserId = null) => {
   const auction = await Auction.findById(auctionId);
   if (!auction || auction.status !== 'live' || auction.endTime < new Date()) {
+    console.log('Auto-bid processing stopped: Auction not live or ended');
     return [];
   }
 
@@ -14,12 +15,18 @@ const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUs
     .sort('-maxAmount')
     .populate('user', 'username');
 
+
   let newBids = [];
   let highestBid = currentBid || auction.startingBid;
 
   for (const autoBid of autoBids) {
-    if (autoBid.user._id.toString() === triggeringUserId) continue;
-    if (autoBid.maxAmount <= highestBid) continue;
+    // Only skip if triggeringUserId is provided and matches
+    if (triggeringUserId && autoBid.user._id.toString() === triggeringUserId) {
+      continue;
+    }
+    if (autoBid.maxAmount <= highestBid) {
+      continue;
+    }
 
     const nextBid = highestBid + bidIncrement;
     if (nextBid <= autoBid.maxAmount) {
@@ -45,6 +52,8 @@ const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUs
 
       highestBid = nextBid;
       newBids.push(bid);
+    } else {
+      console.log('Next bid exceeds maxAmount for user:', autoBid.user.username, 'Next bid:', nextBid, 'maxAmount:', autoBid.maxAmount);
     }
   }
 
@@ -207,8 +216,9 @@ export const setAutoBid = async (req, res) => {
       { upsert: true, new: true, runValidators: true }
     );
 
-    // Process automated bids immediately
-    const autoBids = await processAutoBids(auctionId, auction.currentBid, auction.bidIncrement, userId);
+
+    // Process automated bids immediately, allowing triggering user's auto-bid
+    const autoBids = await processAutoBids(auctionId, auction.currentBid, auction.bidIncrement);
     for (const autoBid of autoBids) {
       const populatedAutoBid = await Bid.findById(autoBid._id)
         .populate('user', 'username')

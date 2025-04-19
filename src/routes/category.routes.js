@@ -14,7 +14,7 @@ const router = express.Router();
 
 // Admin-only routes
 router.post('/', verifyJWT, isAdmin, upload.single('image'), createCategory); 
-router.put('/update/:categoryId', verifyJWT, isAdmin, updateCategory); 
+router.put('/update/:categoryId', verifyJWT, isAdmin, upload.single('image'), updateCategory); 
 router.delete('/delate/:categoryId', verifyJWT, isAdmin, deleteCategory); 
 
 // Public route (for sellers and others)
