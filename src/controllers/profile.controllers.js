@@ -1,4 +1,4 @@
-import { User } from "../models/user.model.js";
+import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utilty/cloudinary.utilty.js";
 
 export const getUserProfile = async (req, res) => {

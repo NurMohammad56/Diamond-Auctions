@@ -54,6 +54,8 @@ import bidRoutes from './src/routes/bid.routes.js';
 import categoryRoutes from './src/routes/category.routes.js';
 import blogRoutes from './src/routes/blog.routes.js';
 import contactUsRoutes from './src/routes/contactus.routes.js';
+import profileRoutes from './src/routes/profile.routes.js';
+
 // import userRoutes from './routes/user.routes.js';
 
 // Mount routers
@@ -64,6 +66,7 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/admin/categories', categoryRoutes);
 app.use('/api/v1/admin/blogs', blogRoutes);
 app.use('/api/v1/contactus', contactUsRoutes);
+app.use('/api/v1/profile', profileRoutes);
 
 // app.use('/api/v1/users', userRoutes);
 
