@@ -1,4 +1,4 @@
-import mongoose, {Schema} from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -26,9 +26,15 @@ const userSchema = new Schema({
     address: {
         street: String,
         city: String,
-        state: String,
         country: String,
         postalCode: String,
+        taxId: String,
+    },
+    image: {
+        type: String,
+    },
+    bio: {
+        type: String,
     },
     role: {
         type: String,
@@ -56,11 +62,11 @@ userSchema.pre('save', async function (next) {
 // Method to check password
 userSchema.methods.isValidPassword = function (password) {
     if (!password || !this.password) {
-      throw new Error("Password or hashed password is missing");
+        throw new Error("Password or hashed password is missing");
     }
-  
+
     return bcrypt.compare(password, this.password);
-  };
+};
 
 // generate access token
 userSchema.methods.generateAccessToken = function () {
