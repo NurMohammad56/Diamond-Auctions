@@ -36,11 +36,7 @@ const auctionSchema = new Schema({
     type: Boolean,
     default: false
   },
-  status: {
-    type: String,
-    enum: ['upcoming', 'live', 'completed', 'latest'],
-    default: 'upcoming'
-  },
+  status: { type: String, enum: ['pending', 'scheduled', 'live', 'completed', 'cancelled'], default: 'pending' },
   winner: {
     type: Schema.Types.ObjectId,
     ref: 'User'
