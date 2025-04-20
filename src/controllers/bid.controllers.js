@@ -420,3 +420,177 @@ export const getBidsHistory = async (req, res) => {
     return res.status(400).json({ status: false, message: err.message });
   }
 };
+
+// Get Top Bidders
+export const getTopBidders = async (req, res) => {
+  try {
+    // Step 1: Start with all bids
+    let pipeline = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+    ]);
+    console.log('After lookup auctions:', pipeline.length);
+
+    // Step 2: Unwind auctionData
+    pipeline = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+      { $unwind: '$auctionData' },
+    ]);
+    console.log('After unwind auctionData:', pipeline.length);
+
+    // Step 3: Match completed auctions where user is the winner
+    pipeline = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+      { $unwind: '$auctionData' },
+      {
+        $match: {
+          'auctionData.status': 'completed',
+          $expr: { $eq: ['$user', '$auctionData.winner'] },
+        },
+      },
+    ]);
+    console.log('After match completed auctions:', pipeline.length);
+
+    // Step 4: Group by user
+    pipeline = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+      { $unwind: '$auctionData' },
+      {
+        $match: {
+          'auctionData.status': 'completed',
+          $expr: { $eq: ['$user', '$auctionData.winner'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$user',
+          auctionsWon: { $sum: 1 },
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+    console.log('After group by user:', pipeline.length);
+
+    // Step 5: Lookup users
+    pipeline = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+      { $unwind: '$auctionData' },
+      {
+        $match: {
+          'auctionData.status': 'completed',
+          $expr: { $eq: ['$user', '$auctionData.winner'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$user',
+          auctionsWon: { $sum: 1 },
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+    ]);
+    console.log('After lookup users:', pipeline.length);
+
+    // Final pipeline
+    const topBidders = await Bid.aggregate([
+      {
+        $lookup: {
+          from: 'auctions',
+          localField: 'auction',
+          foreignField: '_id',
+          as: 'auctionData',
+        },
+      },
+      { $unwind: '$auctionData' },
+      {
+        $match: {
+          'auctionData.status': 'completed',
+          $expr: { $eq: ['$user', '$auctionData.winner'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$user',
+          auctionsWon: { $sum: 1 },
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      { $sort: { totalAmount: -1 } },
+      { $limit: 5 },
+      {
+        $project: {
+          _id: '$user._id',
+          username: '$user.username',
+          email: '$user.email',
+          createdAt: '$user.createdAt',
+          auctionsWon: 1,
+          totalAmount: 1,
+        },
+      },
+    ]);
+
+    console.log('Final top bidders:', topBidders.length);
+
+    return res.status(200).json({
+      status: true,
+      message: 'Top bidders retrieved successfully',
+      results: topBidders.length,
+      data: topBidders,
+    });
+  } catch (err) {
+    console.error('Error in getTopBidders:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};

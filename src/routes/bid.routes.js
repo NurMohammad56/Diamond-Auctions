@@ -6,7 +6,8 @@ import {
   getBidsForAuction,
   getBidsHistory,
   setAutoBid,
-  getUserAutoBids
+  getUserAutoBids,
+  getTopBidders
 } from '../controllers/bid.controllers.js';
 import { verifyJWT } from '../middlewares/auth.middlewares.js';
 
@@ -16,8 +17,9 @@ router.post('/auctions/:auctionId', verifyJWT, placeBid);
 router.post('/:auctionId/auto', verifyJWT, setAutoBid);
 router.get('/user', verifyJWT, getUserBids);
 router.get('/user/auto', verifyJWT, getUserAutoBids);
+router.get('/top-bidders',verifyJWT, getTopBidders);
 router.get('/:id', verifyJWT, getBid);
-router.get('/auction/:auctionId', getBidsForAuction);
-router.get('/auction/:auctionId/history', getBidsHistory);
+router.get('/auction/:auctionId',verifyJWT, getBidsForAuction);
+router.get('/auction/:auctionId/history',verifyJWT, getBidsHistory);
 
 export default router;
