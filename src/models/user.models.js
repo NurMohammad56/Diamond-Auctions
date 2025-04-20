@@ -41,6 +41,7 @@ const userSchema = new Schema({
         enum: ['bidder', 'seller', 'admin'],
         default: 'bidder',
     },
+    sellerId: { type: String, unique: true },
     otp: {
         type: String,
     },

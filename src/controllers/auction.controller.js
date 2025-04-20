@@ -279,3 +279,80 @@ export const getRelatedAuctions = async (req, res) => {
     return res.status(500).json({ status: false, message: 'Server error' });
   }
 };
+
+// Check and Update Scheduled Auctions to Live
+export const checkScheduledAuctions = async () => {
+  try {
+    const currentTime = new Date();
+    console.log('Current time (UTC) for scheduled check:', currentTime.toISOString());
+
+    const auctions = await Auction.find({
+      status: 'scheduled',
+      startTime: { $lte: new Date(currentTime.toISOString()) },
+    });
+
+    console.log('Checking for scheduled auctions to start... Found:', auctions.length);
+    if (auctions.length > 0) {
+      auctions.forEach(auction => {
+        console.log(`Auction ${auction._id}: startTime=${auction.startTime.toISOString()}`);
+      });
+    }
+
+    for (const auction of auctions) {
+      auction.status = 'live';
+      await auction.save();
+      console.log(`Auction ${auction._id} started. Status: ${auction.status}`);
+    }
+  } catch (err) {
+    console.error('Error in checkScheduledAuctions:', err.message);
+  }
+};
+
+// Check and Update Ended Auctions
+export const checkEndedAuctions = async () => {
+  try {
+    const currentTime = new Date();
+    console.log('Current time (UTC) for ended check:', currentTime.toISOString());
+
+    const auctions = await Auction.find({
+      status: 'live',
+      endTime: { $lte: new Date(currentTime.toISOString()) },
+    });
+
+    console.log('Checking for ended auctions... Found:', auctions.length);
+    if (auctions.length > 0) {
+      auctions.forEach(auction => {
+        console.log(`Auction ${auction._id}: endTime=${auction.endTime.toISOString()}`);
+      });
+    }
+
+    for (const auction of auctions) {
+      const highestBid = await Bid.findOne({ auction: auction._id })
+        .sort('-amount')
+        .populate('user', 'username');
+
+      if (highestBid) {
+        console.log(`Highest bid for auction ${auction._id}: Amount=${highestBid.amount}, User=${highestBid.user._id}`);
+        if (highestBid.amount >= auction.reservePrice) {
+          auction.status = 'completed';
+          auction.winner = highestBid.user._id;
+          auction.reserveMet = true;
+        } else {
+          auction.status = 'completed';
+          auction.winner = null;
+          auction.reserveMet = false;
+        }
+      } else {
+        console.log(`No bids found for auction ${auction._id}`);
+        auction.status = 'completed';
+        auction.winner = null;
+        auction.reserveMet = false;
+      }
+
+      await auction.save();
+      console.log(`Auction ${auction._id} ended. Status: ${auction.status}, Winner: ${auction.winner}`);
+    }
+  } catch (err) {
+    console.error('Error in checkEndedAuctions:', err.message);
+  }
+};
