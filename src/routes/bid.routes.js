@@ -8,7 +8,8 @@ import {
   setAutoBid,
   getUserAutoBids,
   getTopBidders,
-  getAllBidders
+  getAllBidders,
+  deleteBidder
 } from '../controllers/bid.controllers.js';
 import { verifyJWT } from '../middlewares/auth.middlewares.js';
 
@@ -23,5 +24,6 @@ router.get('/all',verifyJWT, getAllBidders);
 router.get('/:id', verifyJWT, getBid);
 router.get('/auction/:auctionId',verifyJWT, getBidsForAuction);
 router.get('/auction/:auctionId/history',verifyJWT, getBidsHistory);
+router.delete('/delete/:id',verifyJWT, deleteBidder);
 
 export default router;

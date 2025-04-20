@@ -2,6 +2,7 @@ import { Bid } from '../models/bid.models.js';
 import { Auction } from '../models/auction.models.js';
 import { AutoBid } from '../models/autobidding.models.js';
 import { io } from '../../server.js';
+import { User } from '../models/user.models.js';
 
 // Helper function to process automated bids
 const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUserId = null) => {
@@ -445,7 +446,6 @@ export const getTopBidders = async (req, res) => {
           _id: '$user',
           auctionsWon: { $sum: 1 },
           totalAmount: { $sum: '$amount' },
-          recentWin: { $max: '$createdAt' },
         },
       },
       {
@@ -457,7 +457,7 @@ export const getTopBidders = async (req, res) => {
         },
       },
       { $unwind: '$user' },
-      { $sort: { recentWin: -1, totalAmount: -1 } },
+      { $sort: { totalAmount: -1 } },
       { $limit: 5 },
       {
         $project: {
@@ -467,7 +467,6 @@ export const getTopBidders = async (req, res) => {
           createdAt: '$user.createdAt',
           auctionsWon: 1,
           totalAmount: 1,
-          recentWin: 1,
         },
       },
     ]);
@@ -484,36 +483,127 @@ export const getTopBidders = async (req, res) => {
   }
 };
 
-// Get all bidders 
+
+// Get All Bidders
 export const getAllBidders = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 5 } = req.query;
     const skip = (page - 1) * limit;
 
-    const bidders = await Bid.find()
-      .populate('user', 'username')
-      .populate('auction', 'title')
-      .sort('-createdAt')
-      .skip(skip)
-      .limit(parseInt(limit));
+    const bidderAggregation = await Bid.aggregate([
+      {
+        $group: {
+          _id: '$user',
+          totalBids: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $lookup: {
+          from: 'auctions',
+          let: { userId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$winner', '$$userId'] },
+                    { $eq: ['$status', 'completed'] },
+                  ],
+                },
+              },
+            },
+            { $count: 'auctionsWon' },
+          ],
+          as: 'auctionsWon',
+        },
+      },
+      {
+        $unwind: {
+          path: '$auctionsWon',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: '$user._id',
+          bidder: '$user.username',
+          contact: {
+            email: '$user.email',
+            phone: '$user.phone',
+          },
+          joinDate: '$user.createdAt',
+          totalBids: 1,
+          winAuctions: { $ifNull: ['$auctionsWon.auctionsWon', 0] },
+        },
+      },
+      { $sort: { joinDate: -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+    ]);
 
-    const totalBids = await Bid.countDocuments();
+    const totalBiddersResult = await Bid.aggregate([
+      { $group: { _id: '$user' } },
+      { $count: 'totalBidders' },
+    ]);
 
-    if (!bidders || bidders.length === 0) {
+    const totalBidders = totalBiddersResult.length > 0 ? totalBiddersResult[0].totalBidders : 0;
+
+    if (!bidderAggregation || bidderAggregation.length === 0) {
       return res.status(404).json({ status: false, message: 'No bidders found' });
     }
 
     return res.status(200).json({
       status: true,
       message: 'Bidders retrieved successfully',
-      results: bidders.length,
-      total: totalBids,
+      results: bidderAggregation.length,
+      total: totalBidders,
       currentPage: parseInt(page),
-      totalPages: Math.ceil(totalBids / limit),
-      data: bidders
+      totalPages: Math.ceil(totalBidders / limit),
+      data: bidderAggregation.map(bidder => ({
+        userId: bidder._id, // Adding userId (bidderId) to the response
+        bidder: bidder.bidder,
+        contact: {
+          email: bidder.contact.email,
+          phone: bidder.contact.phone || '+1 (555) 123-4567',
+        },
+        joinDate: bidder.joinDate.toISOString().split('T')[0],
+        totalBids: bidder.totalBids,
+        winAuctions: bidder.winAuctions,
+      })),
     });
   } catch (err) {
     console.error('Error in getAllBidders:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
+// Delete bidders
+export const deleteBidder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bidder = await User.findByIdAndDelete(id); // Use the User model instead of Bid
+
+    if (!bidder) {
+      return res.status(404).json({ status: false, message: 'Bidder not found' });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Bidder deleted successfully',
+      data: bidder
+    });
+  } catch (err) {
+    console.error('Error in deleteBidder:', err.message);
     return res.status(400).json({ status: false, message: err.message });
   }
 };
+
