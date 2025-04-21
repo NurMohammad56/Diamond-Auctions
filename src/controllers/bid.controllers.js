@@ -422,6 +422,312 @@ export const getBidsHistory = async (req, res) => {
   }
 };
 
+// Get Auction Details for a Specific Auction
+export const getAuctionDetails = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) {
+      return res.status(401).json({
+        status: false,
+        message: 'Authentication required: user ID not found',
+      });
+    }
+
+    const { auctionId } = req.params;
+
+    // Check if the user has bid on this auction
+    const userBid = await Bid.findOne({ auction: auctionId, user: userId });
+    if (!userBid) {
+      return res.status(403).json({
+        status: false,
+        message: 'You have not bid on this auction',
+      });
+    }
+
+    // Fetch auction details
+    const auction = await Auction.findById(auctionId)
+      .populate('seller', 'username sellerId')
+      .populate('category', 'name')
+      .populate('winner', 'username');
+
+    if (!auction) {
+      return res.status(404).json({
+        status: false,
+        message: 'Auction not found',
+      });
+    }
+
+    // Calculate time left
+    const currentTime = new Date();
+    const timeDiff = new Date(auction.endTime) - currentTime;
+    const daysLeft = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+    const hoursLeft = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutesLeft = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const secondsLeft = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+    // Determine user's status in the auction
+    let userStatus = '';
+    let userRank = null;
+
+    if (auction.status === 'live') {
+      const allBids = await Bid.find({ auction: auction._id })
+        .sort({ amount: -1, createdAt: 1 });
+      const uniqueBidders = [];
+      const bidderMap = new Map();
+
+      allBids.forEach((b) => {
+        if (!bidderMap.has(b.user.toString())) {
+          bidderMap.set(b.user.toString(), b.amount);
+          uniqueBidders.push({ user: b.user.toString(), amount: b.amount });
+        } else if (b.amount > bidderMap.get(b.user.toString())) {
+          bidderMap.set(b.user.toString(), b.amount);
+          const index = uniqueBidders.findIndex(
+            (ub) => ub.user === b.user.toString()
+          );
+          uniqueBidders[index].amount = b.amount;
+        }
+      });
+
+      uniqueBidders.sort((a, b) => b.amount - a.amount);
+
+      userRank = uniqueBidders.findIndex(
+        (ub) => ub.user === userId.toString()
+      ) + 1;
+
+      const rankSuffix = (rank) => {
+        if (rank % 10 === 1 && rank % 100 !== 11) return 'st';
+        if (rank % 10 === 2 && rank % 100 !== 12) return 'nd';
+        if (rank % 10 === 3 && rank % 100 !== 13) return 'rd';
+        return 'th';
+      };
+
+      userStatus = `You are currently ${userRank}${rankSuffix(userRank)}`;
+    } else if (auction.status === 'completed') {
+      if (auction.winner && auction.winner._id.toString() === userId.toString()) {
+        userStatus = `YOU WON the bid: ${auction.currentBid.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
+      } else {
+        const allBids = await Bid.find({ auction: auction._id })
+          .sort({ amount: -1, createdAt: 1 });
+        const uniqueBidders = [];
+        const bidderMap = new Map();
+
+        allBids.forEach((b) => {
+          if (!bidderMap.has(b.user.toString())) {
+            bidderMap.set(b.user.toString(), b.amount);
+            uniqueBidders.push({ user: b.user.toString(), amount: b.amount });
+          } else if (b.amount > bidderMap.get(b.user.toString())) {
+            bidderMap.set(b.user.toString(), b.amount);
+            const index = uniqueBidders.findIndex(
+              (ub) => ub.user === b.user.toString()
+            );
+            uniqueBidders[index].amount = b.amount;
+          }
+        });
+
+        uniqueBidders.sort((a, b) => b.amount - a.amount);
+
+        userRank = uniqueBidders.findIndex(
+          (ub) => ub.user === userId.toString()
+        ) + 1;
+
+        const rankSuffix = (rank) => {
+          if (rank % 10 === 1 && rank % 100 !== 11) return 'st';
+          if (rank % 10 === 2 && rank % 100 !== 12) return 'nd';
+          if (rank % 10 === 3 && rank % 100 !== 13) return 'rd';
+          return 'th';
+        };
+
+        userStatus = `You lost (Rank: ${userRank}${rankSuffix(userRank)})`;
+      }
+    } else {
+      userStatus = `Auction ${auction.status.toUpperCase()}`;
+    }
+
+    // Format the response
+    const auctionDetails = {
+      _id: auction._id,
+      sku: auction.sku,
+      title: auction.title,
+      description: auction.description,
+      winningBid: auction.currentBid.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }),
+      timeLeft: {
+        days: daysLeft >= 0 ? String(daysLeft).padStart(2, '0') : '00',
+        hours: hoursLeft >= 0 ? String(hoursLeft).padStart(2, '0') : '00',
+        minutes: minutesLeft >= 0 ? String(minutesLeft).padStart(2, '0') : '00',
+        seconds: secondsLeft >= 0 ? String(secondsLeft).padStart(2, '0') : '00',
+      },
+      endTime: auction.endTime.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      }),
+      timezone: 'UTC 0',
+      images: auction.images,
+      userStatus,
+    };
+
+    return res.status(200).json({
+      status: true,
+      message: 'Auction details retrieved successfully',
+      data: auctionDetails,
+    });
+  } catch (err) {
+    console.error('Error in getAuctionDetails:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+// Get User's Bid History
+export const getUserBidHistory = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) {
+      return res.status(401).json({
+        status: false,
+        message: 'Authentication required: user ID not found',
+      });
+    }
+
+    // Fetch all bids by the user
+    const userBids = await Bid.find({ user: userId })
+      .populate({
+        path: 'auction',
+        select: 'title sku status winner currentBid endTime',
+      })
+      .sort({ createdAt: -1 });
+
+    if (!userBids || userBids.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: 'No bids found for this user',
+      });
+    }
+
+    // Process each bid to determine status and ranking
+    const bidHistory = await Promise.all(
+      userBids.map(async (bid) => {
+        const auction = bid.auction;
+        let statusWithRank = '';
+
+        // Determine auction status and user's rank
+        if (auction.status === 'live') {
+          const allBids = await Bid.find({ auction: auction._id })
+            .sort({ amount: -1, createdAt: 1 });
+          const uniqueBidders = [];
+          const bidderMap = new Map();
+
+          // Group bids by user to get their highest bid
+          allBids.forEach((b) => {
+            if (!bidderMap.has(b.user.toString())) {
+              bidderMap.set(b.user.toString(), b.amount);
+              uniqueBidders.push({ user: b.user.toString(), amount: b.amount });
+            } else if (b.amount > bidderMap.get(b.user.toString())) {
+              bidderMap.set(b.user.toString(), b.amount);
+              const index = uniqueBidders.findIndex(
+                (ub) => ub.user === b.user.toString()
+              );
+              uniqueBidders[index].amount = b.amount;
+            }
+          });
+
+          // Sort unique bidders by highest bid
+          uniqueBidders.sort((a, b) => b.amount - a.amount);
+
+          // Find the user's rank
+          const userRank = uniqueBidders.findIndex(
+            (ub) => ub.user === userId.toString()
+          ) + 1;
+
+          // Format rank 
+          const rankSuffix = (rank) => {
+            if (rank % 10 === 1 && rank % 100 !== 11) return 'st';
+            if (rank % 10 === 2 && rank % 100 !== 12) return 'nd';
+            if (rank % 10 === 3 && rank % 100 !== 13) return 'rd';
+            return 'th';
+          };
+
+          statusWithRank = `LIVE(${userRank}${rankSuffix(userRank)})`;
+        } else if (auction.status === 'completed') {
+          // For completed auctions, check if the user is the winner
+          if (auction.winner && auction.winner.toString() === userId.toString()) {
+            statusWithRank = 'WIN(1st)';
+          } else {
+            // Calculate rank based on all bids
+            const allBids = await Bid.find({ auction: auction._id })
+              .sort({ amount: -1, createdAt: 1 });
+            const uniqueBidders = [];
+            const bidderMap = new Map();
+
+            allBids.forEach((b) => {
+              if (!bidderMap.has(b.user.toString())) {
+                bidderMap.set(b.user.toString(), b.amount);
+                uniqueBidders.push({ user: b.user.toString(), amount: b.amount });
+              } else if (b.amount > bidderMap.get(b.user.toString())) {
+                bidderMap.set(b.user.toString(), b.amount);
+                const index = uniqueBidders.findIndex(
+                  (ub) => ub.user === b.user.toString()
+                );
+                uniqueBidders[index].amount = b.amount;
+              }
+            });
+
+            uniqueBidders.sort((a, b) => b.amount - a.amount);
+
+            const userRank = uniqueBidders.findIndex(
+              (ub) => ub.user === userId.toString()
+            ) + 1;
+
+            const rankSuffix = (rank) => {
+              if (rank % 10 === 1 && rank % 100 !== 11) return 'st';
+              if (rank % 10 === 2 && rank % 100 !== 12) return 'nd';
+              if (rank % 10 === 3 && rank % 100 !== 13) return 'rd';
+              return 'th';
+            };
+
+            statusWithRank = `LOSS(${userRank}${rankSuffix(userRank)})`;
+          }
+        } else {
+          // For other statuses 
+          statusWithRank = auction.status.toUpperCase();
+        }
+
+        // Format the bidding time
+        const biddingTime = bid.createdAt.toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+
+        return {
+          auctionName: auction.title,
+          sku: auction.sku,
+          bid: bid.amount.toLocaleString('en-US', {
+            style: 'currency',
+            currency: 'USD',
+          }),
+          biddingTime,
+          status: statusWithRank,
+          auctionId: auction._id,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: 'Bid history retrieved successfully',
+      data: bidHistory,
+    });
+  } catch (err) {
+    console.error('Error in getUserBidHistory:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
 // Get Top Bidders
 export const getTopBidders = async (req, res) => {
   try {

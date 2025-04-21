@@ -9,7 +9,9 @@ import {
   getUserAutoBids,
   getTopBidders,
   getAllBidders,
-  deleteBidder
+  deleteBidder,
+  getUserBidHistory,
+  getAuctionDetails
 } from '../controllers/bid.controllers.js';
 import { verifyJWT } from '../middlewares/auth.middlewares.js';
 
@@ -21,7 +23,9 @@ router.get('/user', verifyJWT, getUserBids);
 router.get('/user/auto', verifyJWT, getUserAutoBids);
 router.get('/top-bidders',verifyJWT, getTopBidders);
 router.get('/all',verifyJWT, getAllBidders);
+router.get('/user-bid-histroy',verifyJWT, getUserBidHistory);
 router.get('/:id', verifyJWT, getBid);
+router.get('/auction/:auctionId',verifyJWT, getAuctionDetails);
 router.get('/auction/:auctionId',verifyJWT, getBidsForAuction);
 router.get('/auction/:auctionId/history',verifyJWT, getBidsHistory);
 router.delete('/delete/:id',verifyJWT, deleteBidder);
