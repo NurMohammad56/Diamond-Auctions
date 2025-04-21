@@ -41,7 +41,11 @@ const userSchema = new Schema({
         enum: ['bidder', 'seller', 'admin'],
         default: 'bidder',
     },
-    sellerId: { type: String, unique: true },
+    sellerId: {
+        type: String,
+        unique: true,
+        sparse: true // Allows null values without triggering unique constraint
+    },
     otp: {
         type: String,
     },
@@ -53,10 +57,32 @@ const userSchema = new Schema({
     },
 }, { timestamps: true });
 
+
 // Password hashing middleware
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
     this.password = await bcrypt.hash(this.password, 12);
+    next();
+});
+
+// Generate sellerId for new sellers
+userSchema.pre('save', async function (next) {
+    if (this.isNew && this.role === 'seller' && !this.sellerId) {
+        let isUnique = false;
+        let generatedId;
+
+        while (!isUnique) {
+            generatedId = `#${Math.floor(1000 + Math.random() * 9000)}`;
+
+            // Check if ID exists
+            const existingUser = await this.constructor.findOne({ sellerId: generatedId });
+            if (!existingUser) {
+                isUnique = true;
+            }
+        }
+
+        this.sellerId = generatedId;
+    }
     next();
 });
 
@@ -65,7 +91,6 @@ userSchema.methods.isValidPassword = function (password) {
     if (!password || !this.password) {
         throw new Error("Password or hashed password is missing");
     }
-
     return bcrypt.compare(password, this.password);
 };
 
