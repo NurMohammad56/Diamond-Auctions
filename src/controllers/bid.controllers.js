@@ -1072,3 +1072,83 @@ export const getUserNotifications = async (req, res) => {
     return res.status(500).json({ status: false, message: err.message });
   }
 };
+
+// Mark Notifications as Read
+export const markNotificationsAsRead = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) {
+      return res.status(401).json({
+        status: false,
+        message: 'Authentication required: user ID not found',
+      });
+    }
+
+    const { notificationIds } = req.body;
+
+    // Validate input
+    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+      return res.status(400).json({
+        status: false,
+        message: 'notificationIds must be a non-empty array',
+      });
+    }
+
+    // Fetch notifications and ensure they belong to the user
+    const notifications = await Notification.find({
+      _id: { $in: notificationIds },
+      user: userId,
+    });
+
+    if (!notifications || notifications.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: 'No matching notifications found for this user',
+      });
+    }
+
+    // Update the read status to true
+    const updatedNotifications = await Notification.updateMany(
+      { _id: { $in: notificationIds }, user: userId },
+      { $set: { read: true } },
+      { new: true }
+    );
+
+    // Fetch the updated notifications for response
+    const updatedNotificationList = await Notification.find({
+      _id: { $in: notificationIds },
+      user: userId,
+    })
+      .populate('auction', 'title sku')
+      .sort({ createdAt: -1 });
+
+    const formattedNotifications = updatedNotificationList.map((notification) => ({
+      _id: notification._id,
+      message: notification.message,
+      type: notification.type,
+      auction: {
+        _id: notification.auction._id,
+        title: notification.auction.title,
+        sku: notification.auction.sku,
+      },
+      read: notification.read,
+      createdAt: notification.createdAt.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      }),
+    }));
+
+    return res.status(200).json({
+      status: true,
+      message: 'Notifications marked as read successfully',
+      data: formattedNotifications,
+    });
+  } catch (err) {
+    console.error('Error in markNotificationsAsRead:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
