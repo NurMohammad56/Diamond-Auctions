@@ -56,6 +56,7 @@ import blogRoutes from './src/routes/blog.routes.js';
 import contactUsRoutes from './src/routes/contactus.routes.js';
 import profileRoutes from './src/routes/profile.routes.js';
 import adminRoutes from './src/routes/admin.routes.js';
+import aboutUsRoutes from './src/routes/aboutus.routes.js';
 
 // import userRoutes from './routes/user.routes.js';
 
@@ -69,6 +70,7 @@ app.use('/api/v1/admin/blogs', blogRoutes);
 app.use('/api/v1/contactus', contactUsRoutes);
 app.use('/api/v1/profile', profileRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/aboutus', aboutUsRoutes);
 
 // app.use('/api/v1/users', userRoutes);
 
