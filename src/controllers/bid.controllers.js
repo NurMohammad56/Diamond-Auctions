@@ -487,7 +487,7 @@ export const getTopBidders = async (req, res) => {
 // Get All Bidders
 export const getAllBidders = async (req, res) => {
   try {
-    const { page = 1, limit = 5 } = req.query;
+    const { page = 1, limit = 5, search = '', minWins, maxWins } = req.query;
     const skip = (page - 1) * limit;
 
     const bidderAggregation = await Bid.aggregate([
@@ -533,6 +533,24 @@ export const getAllBidders = async (req, res) => {
         },
       },
       {
+        $addFields: {
+          winAuctions: { $ifNull: ['$auctionsWon.auctionsWon', 0] },
+        },
+      },
+      {
+        $match: {
+          ...(search && {
+            'user.username': { $regex: search, $options: 'i' },
+          }),
+          ...(minWins && {
+            winAuctions: { $gte: 1 },
+          }),
+          ...(maxWins && {
+            winAuctions: { $lte: 1 },
+          }),
+        },
+      },
+      {
         $project: {
           _id: '$user._id',
           bidder: '$user.username',
@@ -542,7 +560,7 @@ export const getAllBidders = async (req, res) => {
           },
           joinDate: '$user.createdAt',
           totalBids: 1,
-          winAuctions: { $ifNull: ['$auctionsWon.auctionsWon', 0] },
+          winAuctions: 1,
         },
       },
       { $sort: { joinDate: -1 } },
@@ -550,26 +568,21 @@ export const getAllBidders = async (req, res) => {
       { $limit: parseInt(limit) },
     ]);
 
-    const totalBiddersResult = await Bid.aggregate([
-      { $group: { _id: '$user' } },
-      { $count: 'totalBidders' },
-    ]);
+    const totalBidders = bidderAggregation.length;
 
-    const totalBidders = totalBiddersResult.length > 0 ? totalBiddersResult[0].totalBidders : 0;
-
-    if (!bidderAggregation || bidderAggregation.length === 0) {
+    if (!bidderAggregation || totalBidders === 0) {
       return res.status(404).json({ status: false, message: 'No bidders found' });
     }
 
     return res.status(200).json({
       status: true,
       message: 'Bidders retrieved successfully',
-      results: bidderAggregation.length,
+      results: totalBidders,
       total: totalBidders,
       currentPage: parseInt(page),
       totalPages: Math.ceil(totalBidders / limit),
       data: bidderAggregation.map(bidder => ({
-        userId: bidder._id, // Adding userId (bidderId) to the response
+        userId: bidder._id,
         bidder: bidder.bidder,
         contact: {
           email: bidder.contact.email,
