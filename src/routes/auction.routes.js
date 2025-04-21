@@ -8,6 +8,7 @@ import {
     deleteAuction,
     searchAuctions,
     getRelatedAuctions,
+    getSellerMatrics
 } from '../controllers/auction.controller.js'
 import { getAuctionResult } from '../controllers/bid.controllers.js'
 import upload from "../middlewares/multer.middlewares.js";
@@ -23,6 +24,7 @@ router.post("/upload-auction-images/:id", verifyJWT, isSeller, upload.array('ima
 router.put("/update-auction/:id", verifyJWT, isSeller, updateAuction);
 router.delete("/delete-auction/:id", verifyJWT, isSeller, deleteAuction);
 router.get("/get-all-auctions", verifyJWT, getAllAuctions);
+router.get("/get-seller-statistics", verifyJWT, getSellerMatrics);
 router.get("/get-auction/:id", verifyJWT, getAuction);
 router.get('/search', verifyJWT, searchAuctions);
 router.get('/related-auctions', verifyJWT, getRelatedAuctions);

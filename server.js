@@ -84,6 +84,12 @@ app.use('/api/v1/terms', termsRoutes);
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
+    // Join user room
+    socket.on('joinUser', (userId) => {
+        socket.join(userId);
+        console.log(`User ${socket.id} joined their user room: ${userId}`);
+      });
+
     // Join auction room
     socket.on('joinAuction', (auctionId) => {
         socket.join(auctionId);

@@ -3,6 +3,7 @@ import { Auction } from '../models/auction.models.js';
 import { AutoBid } from '../models/autobidding.models.js';
 import { io } from '../../server.js';
 import { User } from '../models/user.models.js';
+import { Notification } from '../models/notification.models.js';
 
 // Helper function to process automated bids
 const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUserId = null) => {
@@ -69,7 +70,7 @@ export const placeBid = async (req, res) => {
     const userId = req.user.id;
 
     // Find the auction
-    const auction = await Auction.findById(auctionId);
+    const auction = await Auction.findById(auctionId).populate('seller');
     if (!auction) {
       return res.status(404).json({ status: false, message: 'Auction not found' });
     }
@@ -113,6 +114,11 @@ export const placeBid = async (req, res) => {
       });
     }
 
+    // Find the previous highest bid (if any) before creating the new bid
+    const previousHighestBid = await Bid.findOne({ auction: auctionId })
+      .sort({ amount: -1, createdAt: 1 })
+      .populate('user');
+
     // Create manual bid
     const bid = await Bid.create({
       amount,
@@ -151,6 +157,48 @@ export const placeBid = async (req, res) => {
       }
     });
 
+    // Send outbid notification to the previous highest bidder (if exists and not the current bidder)
+    if (previousHighestBid && previousHighestBid.user._id.toString() !== userId.toString()) {
+      const outbidMessage = `You have been outbid on auction "${auction.title}". New highest bid: ${amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
+
+      // Save notification to database
+      const outbidNotification = new Notification({
+        user: previousHighestBid.user._id,
+        auction: auctionId,
+        message: outbidMessage,
+        type: 'outbid',
+      });
+      await outbidNotification.save();
+
+      // Emit real-time notification to the previous bidder
+      io.to(previousHighestBid.user._id.toString()).emit('notification', {
+        message: outbidMessage,
+        auctionId: auctionId,
+        type: 'outbid',
+        createdAt: new Date(),
+      });
+    }
+
+    // Send notification to the seller
+    const sellerMessage = `A new bid of ${amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} has been placed on your auction "${auction.title}"`;
+
+    // Save notification to database
+    const sellerNotification = new Notification({
+      user: auction.seller._id,
+      auction: auctionId,
+      message: sellerMessage,
+      type: 'newBid',
+    });
+    await sellerNotification.save();
+
+    // Emit real-time notification to the seller
+    io.to(auction.seller._id.toString()).emit('notification', {
+      message: sellerMessage,
+      auctionId: auctionId,
+      type: 'newBid',
+      createdAt: new Date(),
+    });
+
     // Process automated bids
     const autoBids = await processAutoBids(auctionId, amount, auction.bidIncrement, userId);
     for (const autoBid of autoBids) {
@@ -160,6 +208,48 @@ export const placeBid = async (req, res) => {
       io.to(auctionId).emit('newBid', {
         bid: populatedAutoBid,
         auction: await Auction.findById(auctionId)
+      });
+
+      // Send outbid notification for auto-bids if the auto-bid user is not the current manual bidder
+      if (autoBid.user.toString() !== userId.toString()) {
+        const autoOutbidMessage = `You have been outbid on auction "${auction.title}" by an auto-bid. New highest bid: ${autoBid.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
+
+        // Save notification to database
+        const autoOutbidNotification = new Notification({
+          user: userId,
+          auction: auctionId,
+          message: autoOutbidMessage,
+          type: 'outbid',
+        });
+        await autoOutbidNotification.save();
+
+        // Emit real-time notification to the manual bidder
+        io.to(userId.toString()).emit('notification', {
+          message: autoOutbidMessage,
+          auctionId: auctionId,
+          type: 'outbid',
+          createdAt: new Date(),
+        });
+      }
+
+      // Send seller notification for each auto-bid
+      const autoSellerMessage = `A new auto-bid of ${autoBid.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} has been placed on your auction "${auction.title}"`;
+
+      // Save notification to database
+      const autoSellerNotification = new Notification({
+        user: auction.seller._id,
+        auction: auctionId,
+        message: autoSellerMessage,
+        type: 'newBid',
+      });
+      await autoSellerNotification.save();
+
+      // Emit real-time notification to the seller
+      io.to(auction.seller._id.toString()).emit('notification', {
+        message: autoSellerMessage,
+        auctionId: auctionId,
+        type: 'newBid',
+        createdAt: new Date(),
       });
     }
 
@@ -926,3 +1016,59 @@ export const deleteBidder = async (req, res) => {
   }
 };
 
+// Get User Notifications
+export const getUserNotifications = async (req, res) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    if (!userId) {
+      return res.status(401).json({
+        status: false,
+        message: 'Authentication required: user ID not found',
+      });
+    }
+
+    // Fetch notifications for the user
+    const notifications = await Notification.find({ user: userId })
+      .populate('auction', 'title sku')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    if (!notifications || notifications.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: 'No notifications found for this user',
+      });
+    }
+
+    // Format notifications
+    const formattedNotifications = notifications.map((notification) => ({
+      _id: notification._id,
+      message: notification.message,
+      type: notification.type,
+      auction: {
+        _id: notification.auction._id,
+        title: notification.auction.title,
+        sku: notification.auction.sku,
+      },
+      read: notification.read,
+      createdAt: notification.createdAt.toLocaleString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      }),
+    }));
+
+    return res.status(200).json({
+      status: true,
+      message: 'Notifications retrieved successfully',
+      results: formattedNotifications.length,
+      data: formattedNotifications,
+    });
+  } catch (err) {
+    console.error('Error in getUserNotifications:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};

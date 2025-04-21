@@ -356,3 +356,57 @@ export const checkEndedAuctions = async () => {
     console.error('Error in checkEndedAuctions:', err.message);
   }
 };
+
+// Get Seller Dashboard Metrics
+export const getSellerMatrics = async (req, res) => {
+  try {
+    const sellerId = req.user ? req.user._id : null;
+    if (!sellerId) {
+      return res.status(401).json({
+        status: false,
+        message: 'Authentication required: seller ID not found',
+      });
+    }
+
+    // Fetch all auctions for the seller
+    const auctions = await Auction.find({ seller: sellerId });
+
+    // Calculate metrics
+    let totalRevenue = 0;
+    let successfulAuctions = 0;
+    let liveAuctions = 0;
+    let endAuctions = 0;
+
+    auctions.forEach((auction) => {
+      if (auction.status === 'completed') {
+        endAuctions += 1;
+        if (auction.winner) {
+          successfulAuctions += 1;
+          totalRevenue += auction.currentBid;
+        }
+      } else if (auction.status === 'live') {
+        liveAuctions += 1;
+      }
+    });
+
+    // Format the response
+    const dashboardData = {
+      totalRevenue: totalRevenue.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }),
+      successfulAuctions,
+      liveAuctions,
+      endAuctions,
+    };
+
+    return res.status(200).json({
+      status: true,
+      message: 'Seller dashboard metrics retrieved successfully',
+      data: dashboardData,
+    });
+  } catch (err) {
+    console.error('Error in getSellerDashboard:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
