@@ -10,7 +10,7 @@ import { isAdmin } from "../middlewares/role.middlewares.js";
 const router = express.Router();
 
 
-router.post("/", verifyJWT, isAdmin, createPolicy);
+router.post("/create", verifyJWT, isAdmin, createPolicy);
 router.get("/", verifyJWT, getPolicy);
 router.put("/update/:id", verifyJWT, isAdmin, updatePolicy);
 
