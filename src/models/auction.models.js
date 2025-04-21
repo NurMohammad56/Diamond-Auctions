@@ -59,7 +59,6 @@ const auctionSchema = new Schema({
   sku: {
     type: String,
     unique: true,
-    required: true
   },
   bidHistoryVisibility: {
     type: String,
@@ -77,6 +76,29 @@ const auctionSchema = new Schema({
     type: Date,
     default: Date.now
   }
+});
+
+
+auctionSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    let isUnique = false;
+    let generatedSku;
+
+    while (!isUnique) {
+      // Generate random 5-digit number (10000-99999)
+      const randomNum = Math.floor(10000 + Math.random() * 90000);
+      generatedSku = `RDR${randomNum}`;
+
+      // Check if SKU exists
+      const existingAuction = await this.constructor.findOne({ sku: generatedSku });
+      if (!existingAuction) {
+        isUnique = true;
+      }
+    }
+
+    this.sku = generatedSku;
+  }
+  next();
 });
 
 auctionSchema.virtual('bids', {
