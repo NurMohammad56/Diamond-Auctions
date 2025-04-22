@@ -59,6 +59,7 @@ import adminRoutes from './src/routes/admin.routes.js';
 import aboutUsRoutes from './src/routes/aboutus.routes.js';
 import policyRoutes from './src/routes/policy.routes.js';
 import termsRoutes from './src/routes/terms.routes.js';
+import paymentRoutes from './src/routes/payment.routes.js'
 
 
 // import userRoutes from './routes/user.routes.js';
@@ -76,6 +77,7 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/aboutus', aboutUsRoutes);
 app.use('/api/v1/policy', policyRoutes);
 app.use('/api/v1/terms', termsRoutes);
+app.use('/api/v1', paymentRoutes)
 
 // app.use('/api/v1/users', userRoutes);
 
