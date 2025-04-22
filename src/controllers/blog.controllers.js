@@ -53,13 +53,19 @@ export const getBlogs = async (req, res) => {
 
         const totalBlogs = await Blog.countDocuments();
 
+        // Count total comments for each blog
+        const blogsWithCommentCount = blogs.map(blog => ({
+            ...blog.toObject(),
+            commentCount: blog.comments.length,
+        }));
+
         return res.status(200).json({
             status: true,
             message: 'Blog posts retrieved successfully',
             results: blogs.length,
             totalPages: Math.ceil(totalBlogs / limit),
             currentPage: parseInt(page),
-            data: blogs,
+            data: blogsWithCommentCount,
         });
     } catch (err) {
         console.error('Error in getBlogs:', err.message);
