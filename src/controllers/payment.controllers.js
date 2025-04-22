@@ -1,5 +1,5 @@
 import Stripe from 'stripe'
-import {PaymentInfo} from '../models/paymentInfo.models.js'
+import { PaymentInfo } from '../models/paymentInfo.models.js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
@@ -51,4 +51,44 @@ export const payment = async (req, res) => {
   }
 }
 
-
+// Update payment status based on query params (GET method)
+export const updatePaymentStatus = async (req, res) => {
+  const { stripeSessionId } = req.query
+  if (!stripeSessionId) {
+    return res.status(400).json({
+      success: false,
+      message: 'stripeSessionId is required.',
+    })
+  }
+  try {
+    // Fetch session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(stripeSessionId)
+    let paymentStatus
+    if (session && session.payment_status === 'paid') {
+      paymentStatus = 'compleat'
+    } else {
+      paymentStatus = 'failed'
+    }
+    const payment = await PaymentInfo.findOneAndUpdate(
+      { stripeSessionId },
+      { paymentStatus },
+      { new: true }
+    )
+    if (!payment) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Payment not found.' })
+    }
+    res.status(200).json({
+      success: true,
+      message: `Payment marked as ${paymentStatus}.`,
+      data: payment,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update payment status',
+      error: error.message,
+    })
+  }
+}
