@@ -127,7 +127,7 @@ export const getAllCategories = async (req, res) => {
     try {
         const categories = await Category.find()
             .sort('name')
-            .select('name description');
+            .select('name description image');
 
         return res.status(200).json({
             status: true,
@@ -146,7 +146,7 @@ export const getCategoriesWithAuctions = async (req, res) => {
     try {
         const categories = await Category.find()
             .sort('name')
-            .select('name description');
+            .select('name description image');
 
         // Fetch auctions for each category
         const categoriesWithAuctions = await Promise.all(
@@ -154,13 +154,14 @@ export const getCategoriesWithAuctions = async (req, res) => {
                 const auctions = await Auction.find({ category: category._id })
                     .populate('category', 'name')
                     .populate('seller', 'username')
-                    .select('title description caratWeight currentBid status startTime endTime')
+                    .select('title description caratWeight currentBid images status startTime endTime')
                     .sort('-createdAt');
 
                 return {
                     _id: category._id,
                     name: category.name,
                     description: category.description,
+                    image: category.image,
                     auctions: auctions
                 };
             })
