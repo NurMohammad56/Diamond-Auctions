@@ -702,6 +702,23 @@ export const getUserBidHistory = async (req, res) => {
     const bidHistory = await Promise.all(
       userBids.map(async (bid) => {
         const auction = bid.auction;
+        if (!auction) {
+          return {
+            auctionName: 'Unknown',
+            sku: 'N/A',
+            bid: bid.amount.toLocaleString('en-US', {
+              style: 'currency',
+              currency: 'USD',
+            }),
+            biddingTime: bid.createdAt.toLocaleDateString('en-US', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            }),
+            status: 'Auction data unavailable',
+            auctionId: 'N/A',
+          };
+        }
         let statusWithRank = '';
 
         // Determine auction status and user's rank
