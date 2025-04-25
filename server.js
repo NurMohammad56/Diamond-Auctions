@@ -7,47 +7,30 @@ import compression from "compression";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import "./src/utilty/auctions.cron.utility.js";
- 
 import dbconfig from "./src/configs/db.configs.js";
- 
 // Load env vars
 dotenv.config({ path: "./.env" });
- 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5100",
-];
- 
+// Allowed CORS origins
+const allowedOrigins = ["http://localhost:3000", "http://localhost:5100"];
+// Initialize express app
 const app = express();
 const httpServer = createServer(app);
+// Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:5003"], // Add all needed origins
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
- 
-// Enable CORS
-app.use(
-  cors({
-      origin: allowedOrigins,
-      credentials: true
-  })
-);
- 
-// Set security HTTP headers
+// Middlewares
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(helmet());
- 
-// Body parser
 app.use(express.json());
-app.use(express.urlencoded());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
- 
-// Compress all responses
 app.use(compression());
- 
-// Route files
+// Import routes
 import auctionRoutes from "./src/routes/auction.routes.js";
 import authRoutes from "./src/routes/auth.routes.js";
 import wishlistRoutes from "./src/routes/wishlist.routes.js";
@@ -61,10 +44,7 @@ import aboutUsRoutes from "./src/routes/aboutus.routes.js";
 import policyRoutes from "./src/routes/policy.routes.js";
 import termsRoutes from "./src/routes/terms.routes.js";
 import paymentRoutes from "./src/routes/payment.routes.js";
- 
-// import userRoutes from './routes/user.routes.js';
- 
-// Mount routers
+// Mount all routes
 app.use("/api/v1/auctions", auctionRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/bids", bidRoutes);
@@ -78,52 +58,44 @@ app.use("/api/v1/aboutus", aboutUsRoutes);
 app.use("/api/v1/policy", policyRoutes);
 app.use("/api/v1/terms", termsRoutes);
 app.use("/api/v1", paymentRoutes);
- 
-// app.use('/api/v1/users', userRoutes);
- 
-// Socket.IO connection
+// Initialize Socket.IO events
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
- 
   // Join user room
   socket.on("joinUser", (userId) => {
     socket.join(userId);
-    console.log(`User ${socket.id} joined their user room: ${userId}`);
+    console.log(`User ${socket.id} joined room: ${userId}`);
   });
- 
   // Join auction room
   socket.on("joinAuction", (auctionId) => {
     socket.join(auctionId);
     console.log(`Client ${socket.id} joined auction ${auctionId}`);
   });
- 
   // Leave auction room
   socket.on("leaveAuction", (auctionId) => {
     socket.leave(auctionId);
     console.log(`Client ${socket.id} left auction ${auctionId}`);
   });
- 
+  // On disconnect
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
 });
- 
- 
-// Database and port
+// Connect to DB and start server
 dbconfig()
-.then(() => {
+  .then(() => {
+    const PORT = process.env.PORT || 5003;
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:5100`);
+    });
     app.on("error", (err) => {
-        console.log(`Error while listening on port: ${process.env.PORT}`, err);
+      console.error("Server error:", err);
       throw err;
     });
-   
-    app.listen(process.env.PORT || 5003, () => {
-        console.log(`The server is listening on port ${process.env.PORT}`);
-    });
-})
-.catch((err) => {
-    console.log(`Error connecting to database`, err);
+  })
+  .catch((err) => {
+    console.error("DB connection failed:", err);
     throw err;
-});
- 
+  });
+// Export io for emitting events elsewhere
 export { io };
