@@ -25,7 +25,11 @@ const io = new Server(httpServer, {
 });
 
 // Enable CORS
-app.use(cors());
+app.use(cors(
+    {
+        origin: "*"
+    }
+));
 
 // Set security HTTP headers
 app.use(helmet());
