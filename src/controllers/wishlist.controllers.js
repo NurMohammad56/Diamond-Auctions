@@ -95,7 +95,7 @@ export const getWishlist = async (req, res) => {
         const wishlist = await Wishlist.findOne({ user: userId })
             .populate({
                 path: 'auctions',
-                select: 'title description category caratWeight currentBid status startTime endTime',
+                select: 'title description images category caratWeight currentBid status startTime endTime',
                 populate: { path: 'seller', select: 'username' }
             });
 
