@@ -23,7 +23,7 @@ router.post("/create-auction", verifyJWT, isSeller, createAuctionData);
 router.post("/upload-auction-images/:id", verifyJWT, isSeller, upload.array('images', 10), uploadAuctionImages);
 router.put("/update-auction/:id", verifyJWT, isSeller, updateAuction);
 router.delete("/delete-auction/:id", verifyJWT, isSeller, deleteAuction);
-router.get("/get-all-auctions", verifyJWT, getAllAuctions);
+router.get("/get-all-auctions", getAllAuctions);
 router.get("/get-seller-statistics", verifyJWT, getSellerMatrics);
 router.get("/get-auction/:id", verifyJWT, getAuction);
 router.get('/search', verifyJWT, searchAuctions);
