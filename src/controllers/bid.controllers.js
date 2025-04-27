@@ -5,6 +5,7 @@ import { io } from '../../server.js';
 import { User } from '../models/user.models.js';
 import { Notification } from '../models/notification.models.js';
 
+
 // Helper function to process automated bids
 const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUserId = null) => {
   const auction = await Auction.findById(auctionId);
@@ -17,12 +18,11 @@ const processAutoBids = async (auctionId, currentBid, bidIncrement, triggeringUs
     .sort('-maxAmount')
     .populate('user', 'username');
 
-
   let newBids = [];
   let highestBid = currentBid || auction.startingBid;
 
   for (const autoBid of autoBids) {
-    // Only skip if triggeringUserId is provided and matches
+    if (!autoBid.user || !autoBid.user._id) continue; // Ensure user exists
     if (triggeringUserId && autoBid.user._id.toString() === triggeringUserId) {
       continue;
     }
@@ -67,7 +67,11 @@ export const placeBid = async (req, res) => {
   try {
     const { auctionId } = req.params;
     const { amount } = req.body;
-    const userId = req.user.id;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ status: false, message: 'User not authenticated' });
+    }
 
     // Find the auction
     const auction = await Auction.findById(auctionId).populate('seller');
@@ -81,7 +85,7 @@ export const placeBid = async (req, res) => {
     }
 
     // Check if seller is bidding
-    if (auction.seller.toString() === userId) {
+    if (auction.seller && auction.seller.toString() === userId) {
       return res.status(400).json({ status: false, message: 'Sellers cannot bid on their own auctions' });
     }
 
@@ -158,7 +162,7 @@ export const placeBid = async (req, res) => {
     });
 
     // Send outbid notification to the previous highest bidder (if exists and not the current bidder)
-    if (previousHighestBid && previousHighestBid.user._id.toString() !== userId.toString()) {
+    if (previousHighestBid && previousHighestBid.user && previousHighestBid.user._id.toString() !== userId.toString()) {
       const outbidMessage = `You have been outbid on auction "${auction.title}". New highest bid: ${amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
 
       // Save notification to database
@@ -180,24 +184,26 @@ export const placeBid = async (req, res) => {
     }
 
     // Send notification to the seller
-    const sellerMessage = `A new bid of ${amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} has been placed on your auction "${auction.title}"`;
+    if (auction.seller) {
+      const sellerMessage = `A new bid of ${amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} has been placed on your auction "${auction.title}"`;
 
-    // Save notification to database
-    const sellerNotification = new Notification({
-      user: auction.seller._id,
-      auction: auctionId,
-      message: sellerMessage,
-      type: 'newBid',
-    });
-    await sellerNotification.save();
+      // Save notification to database
+      const sellerNotification = new Notification({
+        user: auction.seller._id,
+        auction: auctionId,
+        message: sellerMessage,
+        type: 'newBid',
+      });
+      await sellerNotification.save();
 
-    // Emit real-time notification to the seller
-    io.to(auction.seller._id.toString()).emit('notification', {
-      message: sellerMessage,
-      auctionId: auctionId,
-      type: 'newBid',
-      createdAt: new Date(),
-    });
+      // Emit real-time notification to the seller
+      io.to(auction.seller._id.toString()).emit('notification', {
+        message: sellerMessage,
+        auctionId: auctionId,
+        type: 'newBid',
+        createdAt: new Date(),
+      });
+    }
 
     // Process automated bids
     const autoBids = await processAutoBids(auctionId, amount, auction.bidIncrement, userId);
@@ -208,48 +214,6 @@ export const placeBid = async (req, res) => {
       io.to(auctionId).emit('newBid', {
         bid: populatedAutoBid,
         auction: await Auction.findById(auctionId)
-      });
-
-      // Send outbid notification for auto-bids if the auto-bid user is not the current manual bidder
-      if (autoBid.user.toString() !== userId.toString()) {
-        const autoOutbidMessage = `You have been outbid on auction "${auction.title}" by an auto-bid. New highest bid: ${autoBid.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
-
-        // Save notification to database
-        const autoOutbidNotification = new Notification({
-          user: userId,
-          auction: auctionId,
-          message: autoOutbidMessage,
-          type: 'outbid',
-        });
-        await autoOutbidNotification.save();
-
-        // Emit real-time notification to the manual bidder
-        io.to(userId.toString()).emit('notification', {
-          message: autoOutbidMessage,
-          auctionId: auctionId,
-          type: 'outbid',
-          createdAt: new Date(),
-        });
-      }
-
-      // Send seller notification for each auto-bid
-      const autoSellerMessage = `A new auto-bid of ${autoBid.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} has been placed on your auction "${auction.title}"`;
-
-      // Save notification to database
-      const autoSellerNotification = new Notification({
-        user: auction.seller._id,
-        auction: auctionId,
-        message: autoSellerMessage,
-        type: 'newBid',
-      });
-      await autoSellerNotification.save();
-
-      // Emit real-time notification to the seller
-      io.to(auction.seller._id.toString()).emit('notification', {
-        message: autoSellerMessage,
-        auctionId: auctionId,
-        type: 'newBid',
-        createdAt: new Date(),
       });
     }
 
@@ -900,115 +864,68 @@ export const getTopBidders = async (req, res) => {
 // Get All Bidders
 export const getAllBidders = async (req, res) => {
   try {
-    const { page = 1, limit = 5, search = '', minWins, maxWins } = req.query;
+    const { search, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    const bidderAggregation = await Bid.aggregate([
-      {
-        $group: {
-          _id: '$user',
-          totalBids: { $sum: 1 },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user',
-        },
-      },
-      { $unwind: '$user' },
-      {
-        $lookup: {
-          from: 'auctions',
-          let: { userId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$winner', '$$userId'] },
-                    { $eq: ['$status', 'completed'] },
-                  ],
-                },
-              },
-            },
-            { $count: 'auctionsWon' },
-          ],
-          as: 'auctionsWon',
-        },
-      },
-      {
-        $unwind: {
-          path: '$auctionsWon',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $addFields: {
-          winAuctions: { $ifNull: ['$auctionsWon.auctionsWon', 0] },
-        },
-      },
-      {
-        $match: {
-          ...(search && {
-            'user.username': { $regex: search, $options: 'i' },
-          }),
-          ...(minWins && {
-            winAuctions: { $gte: 1 },
-          }),
-          ...(maxWins && {
-            winAuctions: { $lte: 1 },
-          }),
-        },
-      },
-      {
-        $project: {
-          _id: '$user._id',
-          bidder: '$user.username',
-          contact: {
-            email: '$user.email',
-            phone: '$user.phone',
-          },
-          joinDate: '$user.createdAt',
-          totalBids: 1,
-          winAuctions: 1,
-        },
-      },
-      { $sort: { joinDate: -1 } },
-      { $skip: skip },
-      { $limit: parseInt(limit) },
-    ]);
+    const bids = await Bid.find().populate('user');
 
-    const totalBidders = bidderAggregation.length;
+    // Create a Map to store the unique users' bids and win count
+    const userBidData = {};
 
-    if (!bidderAggregation || totalBidders === 0) {
-      return res.status(404).json({ status: false, message: 'No bidders found' });
+    // Loop through all the bids
+    bids.forEach((bid) => {
+      const userId = bid.user._id;
+
+      // If the user doesn't exist in the map, initialize their data
+      if (!userBidData[userId]) {
+        userBidData[userId] = {
+          user: bid.user.username,
+          email: bid.user.email,
+          phone: bid.user.phone,
+          joinDate: bid.user.createdAt,
+          totalBids: 0,
+        };
+      }
+
+      // Increment total bids count
+      userBidData[userId].totalBids += 1;
+    });
+
+    // Convert the userBidData map to an array
+    let mappedBidder = Object.keys(userBidData).map((userId) => ({
+      _id: userId,
+      user: userBidData[userId].user,
+      email: userBidData[userId].email,
+      phone: userBidData[userId].phone,
+      joinDate: userBidData[userId].joinDate,
+      totalBids: userBidData[userId].totalBids,
+    }));
+
+    // Apply search filter if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      mappedBidder = mappedBidder.filter(
+        (bidder) =>
+          bidder.user.toLowerCase().includes(searchLower) ||
+          bidder.email.toLowerCase().includes(searchLower)
+      );
     }
 
-    return res.status(200).json({
+    // Pagination
+    const totalBidders = mappedBidder.length;
+    const paginatedBidders = mappedBidder.slice(skip, skip + parseInt(limit));
+
+    res.status(200).json({
       status: true,
-      message: 'Bidders retrieved successfully',
-      results: totalBidders,
+      results: paginatedBidders.length,
       total: totalBidders,
       currentPage: parseInt(page),
       totalPages: Math.ceil(totalBidders / limit),
-      data: bidderAggregation.map(bidder => ({
-        userId: bidder._id,
-        bidder: bidder.bidder,
-        contact: {
-          email: bidder.contact.email,
-          phone: bidder.contact.phone || '+1 (555) 123-4567',
-        },
-        joinDate: bidder.joinDate.toISOString().split('T')[0],
-        totalBids: bidder.totalBids,
-        winAuctions: bidder.winAuctions,
-      })),
+      data: paginatedBidders,
     });
-  } catch (err) {
-    console.error('Error in getAllBidders:', err.message);
-    return res.status(500).json({ status: false, message: err.message });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: false, message: error.message });
   }
 };
 
