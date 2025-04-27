@@ -15,5 +15,6 @@ router.delete('/auctions/:auctionId', adminController.deleteAuction);
 
 router.get('/get-sellers', adminController.getSellers);
 router.delete('/delete-seller/:sellerId', adminController.deleteSeller);
+router.get('/admin-matrices', adminController.getAdminMatrics);
 
 export default router;
