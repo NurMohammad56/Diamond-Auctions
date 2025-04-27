@@ -29,7 +29,7 @@ router.get("/get-all-auctions", getAllAuctions);
 router.get("/get-live-auctions", getLiveAuctionsForHomePage);
 router.get("/get-latest-auctions", getLatestAuctionsForHomePage);
 router.get("/get-seller-statistics", verifyJWT, getSellerMatrics);
-router.get("/get-auction/:id", verifyJWT, getAuction);
+router.get("/get-auction/:id",  getAuction);
 router.get('/search', verifyJWT, searchAuctions);
 router.get('/related-auctions', verifyJWT, getRelatedAuctions);
 router.get('/:auctionId/result', getAuctionResult);
