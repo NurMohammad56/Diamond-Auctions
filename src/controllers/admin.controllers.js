@@ -1,4 +1,5 @@
 import { Auction } from "../models/auction.models.js";
+import { Bid } from "../models/bid.models.js";
 import { Notification } from "../models/notification.models.js";
 import { User } from "../models/user.models.js";
 
@@ -583,6 +584,54 @@ export const deleteAuction = async (req, res) => {
         });
     } catch (err) {
         console.error('Error in deleteAuction:', err.message);
+        return res.status(500).json({ status: false, message: err.message });
+    }
+};
+
+// Admin statistics
+export const getAdminMatrics = async (_, res) => {
+    try {
+        let totalSellers = 0;
+        let totalBidders = 0;
+        let liveAuctions = 0;
+        let endAuctions = 0;
+
+        // Fetch all sellers
+        totalSellers = await User.countDocuments({ role: { $in: ['seller'] } });
+
+        // Fetch all bidders
+        const bidderAggregation = await Bid.aggregate([
+            { $group: { _id: '$user' } },
+        ]);
+        totalBidders = bidderAggregation.length;
+
+        // Fetch all auctions
+        const auctions = await Auction.find();
+
+        // Calculate metrics
+        auctions.forEach((auction) => {
+            if (auction.status === 'completed') {
+                endAuctions += 1;
+            } else if (auction.status === 'live') {
+                liveAuctions += 1;
+            }
+        });
+
+        // Format the response
+        const dashboardData = {
+            totalSellers,
+            totalBidders,
+            liveAuctions,
+            endAuctions,
+        };
+
+        return res.status(200).json({
+            status: true,
+            message: 'Admin dashboard metrics retrieved successfully',
+            data: dashboardData,
+        });
+    } catch (err) {
+        console.error('Error in getAdminMatrics:', err.message);
         return res.status(500).json({ status: false, message: err.message });
     }
 };
