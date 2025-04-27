@@ -103,12 +103,13 @@ export const getAllAuctions = async (req, res) => {
 export const getAuction = async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id)
-      .populate('seller', 'username');
-
+      .populate('seller', 'username')
+      .populate('category', 'name');
+ 
     if (!auction) {
       return res.status(404).json({ status: false, message: 'Auction not found' });
     }
-
+ 
     res.status(200).json({
       status: 'success',
       data: { auction }
@@ -117,6 +118,7 @@ export const getAuction = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+ 
 
 // Update an auction
 export const updateAuction = async (req, res) => {

@@ -13,4 +13,7 @@ router.post('/auctions/:auctionId/accept', adminController.acceptAuction);
 router.post('/auctions/:auctionId/reject', adminController.rejectAuction);
 router.delete('/auctions/:auctionId', adminController.deleteAuction);
 
+router.get('/get-sellers', adminController.getSellers);
+router.delete('/delete-seller/:sellerId', adminController.deleteSeller);
+
 export default router;
