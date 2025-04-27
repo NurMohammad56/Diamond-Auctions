@@ -1,4 +1,6 @@
 import { Auction } from "../models/auction.models.js";
+import { Notification } from "../models/notification.models.js";
+import { User } from "../models/user.models.js";
 
 // Helper function to format auctions with all fields
 const formatAuctionData = (auctions) => {
@@ -45,10 +47,10 @@ const formatAuctionData = (auctions) => {
     });
 };
 
-// Get All Bidders (Updated to match screenshot)
+// Get All Bidders
 export const getAllBidders = async (req, res) => {
     try {
-        const { page = 1, limit = 5 } = req.query; // Default limit to 5 as per screenshot
+        const { page = 1, limit = 5 } = req.query;
         const skip = (page - 1) * limit;
 
         // Step 1: Find all users who have placed at least one bid
@@ -143,15 +145,162 @@ export const getAllBidders = async (req, res) => {
                 bidder: bidder.bidder,
                 contact: {
                     email: bidder.contact.email,
-                    phone: bidder.contact.phone || '+1 (555) 123-4567', // Default phone if not set
+                    phone: bidder.contact.phone || '+1 (555) 123-4567',
                 },
-                joinDate: bidder.joinDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+                joinDate: bidder.joinDate.toISOString().split('T')[0],
                 totalBids: bidder.totalBids,
                 winAuctions: bidder.winAuctions,
             })),
         });
     } catch (err) {
         console.error('Error in getAllBidders:', err.message);
+        return res.status(500).json({ status: false, message: err.message });
+    }
+};
+
+// Get List of Sellers with Metrics
+export const getSellers = async (req, res) => {
+    try {
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Search parameter
+        const search = req.query.search || '';
+        const searchQuery = search
+            ? {
+                $or: [
+                    { username: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } },
+                ],
+            }
+            : {};
+
+        // Fetch sellers
+        const sellers = await User.find({
+            role: 'seller',
+            ...searchQuery,
+        })
+            .skip(skip)
+            .limit(limit)
+            .sort({ createdAt: -1 });
+
+        const totalSellers = await User.countDocuments({
+            role: 'seller',
+            ...searchQuery,
+        });
+
+        if (!sellers || sellers.length === 0) {
+            return res.status(404).json({
+                status: false,
+                message: 'No sellers found',
+            });
+        }
+
+        // Calculate metrics for each seller
+        const sellerData = await Promise.all(
+            sellers.map(async (seller) => {
+                // Total Auctions
+                const totalAuctions = await Auction.countDocuments({ seller: seller._id });
+
+                // Live Auctions
+                const liveAuctions = await Auction.countDocuments({
+                    seller: seller._id,
+                    status: 'live',
+                    endTime: { $gt: new Date() },
+                });
+
+                // Total Sales (successful auctions with a winner)
+                const totalSales = await Auction.countDocuments({
+                    seller: seller._id,
+                    status: 'completed',
+                    winner: { $ne: null },
+                });
+
+                // Sell Amount (total revenue from successful auctions)
+                const successfulAuctions = await Auction.find({
+                    seller: seller._id,
+                    status: 'completed',
+                    winner: { $ne: null },
+                });
+                const sellAmount = successfulAuctions.reduce(
+                    (sum, auction) => sum + (auction.currentBid || 0),
+                    0
+                );
+
+                return {
+                    _id: seller._id,
+                    username: seller.username,
+                    email: seller.email,
+                    phone: seller.phone || '',
+                    sellerId: seller.sellerId,
+                    joinDate: seller.createdAt.toISOString().split('T')[0], // Format as YYYY-MM-DD
+                    totalAuctions,
+                    liveAuctions,
+                    totalSales,
+                    sellAmount: sellAmount.toLocaleString('en-US', {
+                        style: 'currency',
+                        currency: 'USD',
+                    }),
+                };
+            })
+        );
+
+        return res.status(200).json({
+            status: true,
+            message: 'Sellers retrieved successfully',
+            results: sellerData.length,
+            total: totalSellers,
+            page,
+            totalPages: Math.ceil(totalSellers / limit),
+            data: sellerData,
+        });
+    } catch (err) {
+        console.error('Error in getSellers:', err.message);
+        return res.status(500).json({ status: false, message: err.message });
+    }
+};
+
+// Delete a Seller and Associated Data
+export const deleteSeller = async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+
+        // Verify the seller exists
+        const seller = await User.findOne({ _id: sellerId, role: 'seller' });
+        if (!seller) {
+            return res.status(404).json({
+                status: false,
+                message: 'Seller not found',
+            });
+        }
+
+        // Find all auctions by the seller
+        const sellerAuctions = await Auction.find({ seller: sellerId });
+
+        // Delete associated bids, auto-bids, and notifications for each auction
+        for (const auction of sellerAuctions) {
+            await Bid.deleteMany({ auction: auction._id });
+            await AutoBid.deleteMany({ auction: auction._id });
+            await Notification.deleteMany({ auction: auction._id });
+        }
+
+        // Delete the seller's auctions
+        await Auction.deleteMany({ seller: sellerId });
+
+        // Delete the seller's notifications (e.g., outbid notifications)
+        await Notification.deleteMany({ user: sellerId });
+
+        // Delete the seller
+        await User.deleteOne({ _id: sellerId });
+
+        return res.status(200).json({
+            status: true,
+            message: 'Seller and associated data deleted successfully',
+        });
+    } catch (err) {
+        console.error('Error in deleteSeller:', err.message);
         return res.status(500).json({ status: false, message: err.message });
     }
 };
@@ -355,7 +504,7 @@ export const getEndedAuctions = async (req, res) => {
     }
 };
 
-// Accept Auction (for Pending)
+// Accept Auction
 export const acceptAuction = async (req, res) => {
     try {
         const { auctionId } = req.params;
@@ -385,7 +534,7 @@ export const acceptAuction = async (req, res) => {
     }
 };
 
-// Reject Auction (for Pending)
+// Reject Auction
 export const rejectAuction = async (req, res) => {
     try {
         const { auctionId } = req.params;
@@ -414,7 +563,7 @@ export const rejectAuction = async (req, res) => {
     }
 };
 
-// Delete Auction (for any status)
+// Delete Auction
 export const deleteAuction = async (req, res) => {
     try {
         const { auctionId } = req.params;
