@@ -412,3 +412,45 @@ export const getSellerMatrics = async (req, res) => {
     return res.status(500).json({ status: false, message: err.message });
   }
 };
+
+// Get live auctions for the homepage
+export const getLiveAuctionsForHomePage = async (req, res) => {
+  try {
+    const auctions = await Auction.find({ status: 'live' })
+      .populate('category', 'name')
+      .populate('seller', 'username')
+      .sort('-createdAt')
+      .limit(10); // Limit to 10 live auctions
+
+    return res.status(200).json({
+      status: true,
+      message: 'Live auctions retrieved successfully',
+      results: auctions.length,
+      data: auctions
+    });
+  } catch (err) {
+    console.error('Error in getLiveAuctionsForHomePage:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+};
+
+// Get latest auctions for the homepage
+export const getLatestAuctionsForHomePage = async (req, res) => {
+  try {
+    const auctions = await Auction.find()
+      .populate('category', 'name')
+      .populate('seller', 'username')
+      .sort('-createdAt')
+      .limit(10); // Limit to 10 latest auctions
+      return res.status(200).json({
+        status: true,
+        message: 'Latest auctions retrieved successfully',
+        results: auctions.length,
+        data: auctions
+      });
+  }
+  catch (err) {
+    console.error('Error in getLatestAuctionsForHomePage:', err.message);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+  };

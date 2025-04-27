@@ -24,7 +24,7 @@ router.post('/:auctionId/auto', verifyJWT, setAutoBid);
 router.get('/user', verifyJWT, getUserBids);
 router.get('/user/auto', verifyJWT, getUserAutoBids);
 router.get('/top-bidders',verifyJWT, getTopBidders);
-router.get('/all',verifyJWT, getAllBidders);
+router.get('/all',verifyJWT, getAllBidders);   
 router.get('/user-bid-histroy',verifyJWT, getUserBidHistory);
 router.get('/notifications', verifyJWT, getUserNotifications);
 router.post('/notifications/mark-as-read', verifyJWT, markNotificationsAsRead);

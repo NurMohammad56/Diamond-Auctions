@@ -25,12 +25,4 @@ const bidSchema = new Schema({
     },
 });
 
-bidSchema.pre(/^find/, function (next) {
-    this.populate({
-        path: 'user',
-        select: 'username',
-    });
-    next();
-});
-
 export const Bid = mongoose.model('Bid', bidSchema);
