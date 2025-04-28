@@ -28,8 +28,8 @@ export const payment = async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: process.env.SUCCESS_URL,
-      cancel_url: process.env.CANCEL_URL,
+      success_url: `${process.env.SUCCESS_URL}/${session.id}`,
+      cancel_url: `${process.env.CANCEL_URL}/${session.id}`,
     })
 
     // save the payment data
