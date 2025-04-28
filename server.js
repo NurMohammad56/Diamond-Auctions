@@ -44,6 +44,9 @@ import aboutUsRoutes from "./src/routes/aboutus.routes.js";
 import policyRoutes from "./src/routes/policy.routes.js";
 import termsRoutes from "./src/routes/terms.routes.js";
 import paymentRoutes from "./src/routes/payment.routes.js";
+import billingRoutes from "./src/routes/billing.routes.js";
+
+
 // Mount all routes
 app.use("/api/v1/auctions", auctionRoutes);
 app.use("/api/v1/auth", authRoutes);
@@ -58,6 +61,9 @@ app.use("/api/v1/aboutus", aboutUsRoutes);
 app.use("/api/v1/policy", policyRoutes);
 app.use("/api/v1/terms", termsRoutes);
 app.use("/api/v1", paymentRoutes);
+app.use("/api/v1/billing", billingRoutes);
+
+
 // Initialize Socket.IO events
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
