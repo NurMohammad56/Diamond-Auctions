@@ -11,7 +11,7 @@ const router = express.Router();
 
 
 router.post("/create", verifyJWT, isAdmin, createPolicy);
-router.get("/", verifyJWT, getPolicy);
+router.get("/", getPolicy);
 router.put("/update/:id", verifyJWT, isAdmin, updatePolicy);
 
 

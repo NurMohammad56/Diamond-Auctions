@@ -9,7 +9,7 @@ import {
   const router = express.Router();
 
   router.post("/create", verifyJWT, isAdmin, createTerms);
-  router.get("/", verifyJWT, getTerms);
+  router.get("/", getTerms);
   router.put("/update/:id", verifyJWT, isAdmin, updateTerms);
 
     export default router;
