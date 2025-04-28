@@ -5,9 +5,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 export const payment = async (req, res) => {
   const { userId, auctionId, price } = req.body
+
   if (!userId || !auctionId || !price) {
-    res.status(400).json({ success: false, message: 'All field are require.' })
-    return
+    return res
+      .status(400)
+      .json({ success: false, message: 'All fields are required.' })
   }
 
   try {
@@ -28,11 +30,11 @@ export const payment = async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.SUCCESS_URL}/${session.id}`,
-      cancel_url: `${process.env.CANCEL_URL}/${session.id}`,
+      success_url: `${process.env.SUCCESS_URL}/{CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CANCEL_URL}/{CHECKOUT_SESSION_ID}`,
     })
 
-    // save the payment data
+    // Save the payment data
     const newPayment = new PaymentInfo({
       userId,
       auctionId,
