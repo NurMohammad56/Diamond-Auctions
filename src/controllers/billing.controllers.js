@@ -1,21 +1,28 @@
 import { Billing } from "../models/billing.models.js";
+import { PaymentInfo } from "../models/paymentInfo.models.js";
 
 // Create Billing
 export const createBilling = async (req, res) => {
   try {
     const { fullName, address, email, phoneNumber } = req.body;
+    const { auctionId } = req.params;
     const userId = req.user?._id;
 
     if (!userId) {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
+    if (!auctionId) {
+      return res.status(400).json({ message: "Auction ID is required" });
+    }
+
     const newBilling = new Billing({
       user: userId,
+      auction: auctionId,
       fullName,
       address,
       email,
-      phoneNumber,
+      phoneNumber
     });
 
     await newBilling.save();
@@ -35,8 +42,13 @@ export const getBillings = async (req, res) => {
     }
 
     const billings = await Billing.find({ user: userId })
-      .populate("user", "username email") // Populate user details
+      .populate("user", "username email") 
+      .populate("auction", "title currentBid")
       .sort({ createdAt: -1 });
+
+    if (billings.length === 0) {
+      return res.status(404).json({ status: false, message: "No billing information found" });
+    }
 
     res.status(200).json({ status: true, data: billings });
   } catch (error) {

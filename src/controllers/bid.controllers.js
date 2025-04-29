@@ -862,7 +862,9 @@ export const getAllBidders = async (req, res) => {
     }
 
     // Find all auctions created by the seller
-    const sellerAuctions = await Auction.find({ seller: sellerId }).select('_id title winner');
+    const sellerAuctions = await Auction.find({ seller: sellerId })
+      .select('_id title winner')
+      .lean();
     const auctionIds = sellerAuctions.map((auction) => auction._id);
 
     if (auctionIds.length === 0) {
@@ -872,75 +874,83 @@ export const getAllBidders = async (req, res) => {
     // Find all bids for the seller's auctions
     const bids = await Bid.find({ auction: { $in: auctionIds } })
       .populate('user', 'username email phone createdAt')
-      .populate('auction', 'title winner');
+      .populate('auction', 'title winner')
+      .lean();
 
-    // Create a Map to store the unique users' bids and auction names
+    // Aggregate data by user to get unique bidders
     const userBidData = {};
 
-    // Loop through all the bids
     bids.forEach((bid) => {
-      if (!bid.user || !bid.user._id) {
-        // Skip bids with null or invalid user
-        return;
-      }
+      // Skip if user data is missing
+      if (!bid.user || !bid.user._id) return;
 
-      const userId = bid.user._id;
+      const userId = bid.user._id.toString();
 
-      // If the user doesn't exist in the map, initialize their data
+      // Initialize user data if not already present
       if (!userBidData[userId]) {
         userBidData[userId] = {
-          user: bid.user.username,
-          email: bid.user.email,
-          phone: bid.user.phone,
-          joinDate: bid.user.createdAt,
+          user: bid.user.username || 'Unknown',
+          email: bid.user.email || '',
+          phone: bid.user.phone || '',
+          joinDate: bid.user.createdAt || new Date(),
           totalBids: 0,
-          auctions: new Set(), // Use a Set to avoid duplicate auction names
-          winAuctions: 0, // Initialize win auctions count
+          auctions: [],
+          winAuctions: 0,
         };
       }
 
-      // Increment total bids count
+      // Increment total bids for this user
       userBidData[userId].totalBids += 1;
 
-      // Add the auction title to the user's auctions
-      if (bid.auction && bid.auction.title) {
-        userBidData[userId].auctions.add(bid.auction.title);
+      // Add auction details (id and title) to the user's auctions list
+      if (bid.auction && bid.auction._id && bid.auction.title) {
+        const auctionEntry = userBidData[userId].auctions.find(
+          (auction) => auction.id === bid.auction._id.toString()
+        );
+        if (!auctionEntry) {
+          userBidData[userId].auctions.push({
+            id: bid.auction._id.toString(),
+            title: bid.auction.title,
+          });
+        }
       }
 
-      // Check if the user is the winner of the auction
-      if (bid.auction && bid.auction.winner && bid.auction.winner.toString() === userId.toString()) {
+      // Increment win count if the user won this auction
+      if (bid.auction && bid.auction.winner && bid.auction.winner.toString() === userId) {
         userBidData[userId].winAuctions += 1;
       }
     });
 
-    // Convert the userBidData map to an array
-    let mappedBidder = Object.keys(userBidData).map((userId) => ({
+    // Convert aggregated data into an array for mapping
+    let mappedBidders = Object.entries(userBidData).map(([userId, data]) => ({
       _id: userId,
-      user: userBidData[userId].user,
-      email: userBidData[userId].email,
-      phone: userBidData[userId].phone,
-      joinDate: userBidData[userId].joinDate,
-      totalBids: userBidData[userId].totalBids,
-      auctions: Array.from(userBidData[userId].auctions), // Convert Set to Array
-      winAuctions: userBidData[userId].winAuctions, // Include win auctions count
+      user: data.user,
+      email: data.email,
+      phone: data.phone,
+      joinDate: data.joinDate,
+      totalBids: data.totalBids,
+      auctions: data.auctions,
+      winAuctions: data.winAuctions,
     }));
 
     // Apply search filter if provided
     if (search) {
       const searchLower = search.toLowerCase();
-      mappedBidder = mappedBidder.filter(
+      mappedBidders = mappedBidders.filter(
         (bidder) =>
           bidder.user.toLowerCase().includes(searchLower) ||
           bidder.email.toLowerCase().includes(searchLower)
       );
     }
 
-    // Pagination
-    const totalBidders = mappedBidder.length;
-    const paginatedBidders = mappedBidder.slice(skip, skip + parseInt(limit));
+    // Apply pagination
+    const totalBidders = mappedBidders.length;
+    const paginatedBidders = mappedBidders.slice(skip, skip + parseInt(limit));
 
+    // Send response, including the sellerId
     res.status(200).json({
       status: true,
+      sellerId: sellerId.toString(), // Add sellerId to the response
       results: paginatedBidders.length,
       total: totalBidders,
       currentPage: parseInt(page),
@@ -952,6 +962,95 @@ export const getAllBidders = async (req, res) => {
     res.status(500).json({ status: false, message: error.message });
   }
 };
+// Get all bidders for admin dashboard with pagination and wins auctions count
+export const getAllBiddersAdmin = async (req, res) => {
+  try {
+    const { search, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Fetch all bids with user and auction details
+    const bids = await Bid.find()
+      .populate('user', 'username email phone createdAt')
+      .populate('auction', 'title winner')
+      .lean(); // Use lean() for better performance since we don't need Mongoose documents
+
+    // Aggregate data by user to get unique bidders
+    const userBidData = {};
+
+    bids.forEach((bid) => {
+      // Skip if user data is missing
+      if (!bid.user || !bid.user._id) return;
+
+      const userId = bid.user._id.toString(); // Ensure consistent string comparison
+
+      // Initialize user data if not already present
+      if (!userBidData[userId]) {
+        userBidData[userId] = {
+          user: bid.user.username || 'Unknown',
+          email: bid.user.email || '',
+          phone: bid.user.phone || '',
+          joinDate: bid.user.createdAt || new Date(),
+          totalBids: 0,
+          auctions: new Set(),
+          winAuctions: 0,
+        };
+      }
+
+      // Increment total bids for this user
+      userBidData[userId].totalBids += 1;
+
+      // Add auction title to the user's auction set (unique auctions they bid on)
+      if (bid.auction && bid.auction.title) {
+        userBidData[userId].auctions.add(bid.auction.title);
+      }
+
+      // Increment win count if the user won this auction
+      if (bid.auction && bid.auction.winner && bid.auction.winner.toString() === userId) {
+        userBidData[userId].winAuctions += 1;
+      }
+    });
+
+    // Convert aggregated data into an array for mapping
+    let mappedBidders = Object.entries(userBidData).map(([userId, data]) => ({
+      _id: userId,
+      user: data.user,
+      email: data.email,
+      phone: data.phone,
+      joinDate: data.joinDate,
+      totalBids: data.totalBids,
+      auctions: Array.from(data.auctions), // Convert Set to Array
+      winAuctions: data.winAuctions,
+    }));
+
+    // Apply search filter if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      mappedBidders = mappedBidders.filter(
+        (bidder) =>
+          bidder.user.toLowerCase().includes(searchLower) ||
+          bidder.email.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply pagination
+    const totalBidders = mappedBidders.length;
+    const paginatedBidders = mappedBidders.slice(skip, skip + parseInt(limit));
+
+    // Send response
+    res.status(200).json({
+      status: true,
+      results: paginatedBidders.length,
+      total: totalBidders,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalBidders / limit),
+      data: paginatedBidders,
+    });
+  } catch (error) {
+    console.error('Error in getAllBiddersAdmin:', error.message);
+    res.status(500).json({ status: false, message: error.message });
+  }
+};
+
 // Delete bidders
 export const deleteBidder = async (req, res) => {
   try {

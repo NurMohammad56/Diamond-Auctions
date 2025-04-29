@@ -9,7 +9,8 @@ import {
     getRelatedAuctions,
     getSellerMatrics,
     getLiveAuctionsForHomePage,
-    getLatestAuctionsForHomePage
+    getLatestAuctionsForHomePage,
+    getAllAuctionsBySeller
 } from '../controllers/auction.controller.js'
 import { getAuctionResult } from '../controllers/bid.controllers.js'
 import upload from "../middlewares/multer.middlewares.js";
@@ -24,6 +25,7 @@ router.post("/create-auction", verifyJWT, isSeller, upload.array('images', 10), 
 router.put("/update-auction/:id", verifyJWT, isSeller, upload.array('images', 10), updateAuction);
 router.delete("/delete-auction/:id", verifyJWT, isSeller, deleteAuction);
 router.get("/get-all-auctions", getAllAuctions);
+router.get("/get-all-auctions-by-seller", verifyJWT, getAllAuctionsBySeller);
 router.get("/get-live-auctions", getLiveAuctionsForHomePage);
 router.get("/get-latest-auctions", getLatestAuctionsForHomePage);
 router.get("/get-seller-statistics", verifyJWT, getSellerMatrics);

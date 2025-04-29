@@ -6,6 +6,11 @@ const billingSchema = new Schema(
     ref: "User",
     required: true,
   },
+  auction: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Auction",
+    required: true,
+  },
   fullName: {
     type: String,
     required: true,
@@ -13,6 +18,11 @@ const billingSchema = new Schema(
   address: {
     type: String,
     required: true,
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['paid', 'unpaid'],
+    default: 'unpaid',
   },
   email: {
     type: String,
