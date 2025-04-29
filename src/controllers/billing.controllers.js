@@ -1,21 +1,28 @@
 import { Billing } from "../models/billing.models.js";
+import { PaymentInfo } from "../models/paymentInfo.models.js";
 
 // Create Billing
 export const createBilling = async (req, res) => {
   try {
     const { fullName, address, email, phoneNumber } = req.body;
+    const { auctionId } = req.params;
     const userId = req.user?._id;
 
     if (!userId) {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
+    if (!auctionId) {
+      return res.status(400).json({ message: "Auction ID is required" });
+    }
+
     const newBilling = new Billing({
       user: userId,
+      auction: auctionId,
       fullName,
       address,
       email,
-      phoneNumber,
+      phoneNumber
     });
 
     await newBilling.save();

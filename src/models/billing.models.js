@@ -19,6 +19,11 @@ const billingSchema = new Schema(
     type: String,
     required: true,
   },
+  paymentStatus: {
+    type: String,
+    enum: ['paid', 'unpaid'],
+    default: 'unpaid',
+  },
   email: {
     type: String,
     required: true,
