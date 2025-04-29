@@ -3,7 +3,7 @@ import { Category } from '../models/category.models.js';
 import { uploadOnCloudinary } from '../utilty/cloudinary.utilty.js';
 
 
-// Create a new auction
+// Create a new auction with image upload
 export const createAuctionData = async (req, res) => {
   try {
     const { categoryId, ...rest } = req.body;
@@ -14,10 +14,23 @@ export const createAuctionData = async (req, res) => {
       return res.status(400).json({ status: false, message: 'Invalid category ID' });
     }
 
+    // Handle image uploads
+    const imageUploadPromises = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        imageUploadPromises.push(uploadOnCloudinary(file.buffer));
+      }
+    }
+
+    const uploadResults = await Promise.all(imageUploadPromises);
+    const imageUrls = uploadResults.map(result => result.secure_url);
+
+    // Create auction
     const auction = await Auction.create({
       ...rest,
       category: categoryDoc._id,
-      seller: req.user.id
+      seller: req.user.id,
+      images: imageUrls
     });
 
     // Populate category and seller in response
@@ -30,43 +43,8 @@ export const createAuctionData = async (req, res) => {
       data: populatedAuction
     });
   } catch (err) {
-    console.error('Error creating auction data:', err.message);
+    console.error('Error creating auction with images:', err.message);
     return res.status(400).json({ status: false, message: err.message });
-  }
-};
-
-
-// Upload auction images
-export const uploadAuctionImages = async (req, res) => {
-  try {
-    const imageUploadPromises = [];
-
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        imageUploadPromises.push(uploadOnCloudinary(file.buffer));
-      }
-    }
-
-    const uploadResults = await Promise.all(imageUploadPromises);
-
-    const imageUrls = uploadResults.map(result => result.secure_url);
-
-    // Save the image URLs to the database
-    const auction = await Auction.findById(req.params.id);
-    if (!auction) {
-      return res.status(404).json({ status: false, message: 'Auction not found' });
-    }
-
-    auction.images = auction.images ? auction.images.concat(imageUrls) : imageUrls;
-    await auction.save();
-
-    return res.status(200).json({
-      status: 'success',
-      data: imageUrls
-    });
-  } catch (err) {
-    console.error("Error uploading auction images:", err);
-    return res.status(400).json({ error: err.message });
   }
 };
 
@@ -106,11 +84,11 @@ export const getAuction = async (req, res) => {
       .populate('seller', 'username')
       .populate('category', 'name')
       .populate("winner", "username")
- 
+
     if (!auction) {
       return res.status(404).json({ status: false, message: 'Auction not found' });
     }
- 
+
     res.status(200).json({
       status: 'success',
       data: { auction }
@@ -119,14 +97,41 @@ export const getAuction = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
- 
 
-// Update an auction
+
+// Update an auction with image handling
 export const updateAuction = async (req, res) => {
   try {
+    const { categoryId, ...rest } = req.body;
+
+    // Validate category exists if categoryId is provided
+    if (categoryId) {
+      const categoryDoc = await Category.findById(categoryId);
+      if (!categoryDoc) {
+        return res.status(400).json({ status: false, message: 'Invalid category ID' });
+      }
+      rest.category = categoryDoc._id;
+    }
+
+    // Handle image uploads if new images are provided
+    const imageUploadPromises = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        imageUploadPromises.push(uploadOnCloudinary(file.buffer));
+      }
+    }
+
+    const uploadResults = await Promise.all(imageUploadPromises);
+    const imageUrls = uploadResults.map(result => result.secure_url);
+
+    if (imageUrls.length > 0) {
+      rest.images = imageUrls; // Update images if new ones are uploaded
+    }
+
+    // Update the auction
     const auction = await Auction.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      rest,
       { new: true, runValidators: true }
     );
 
@@ -140,6 +145,7 @@ export const updateAuction = async (req, res) => {
       data: auction
     });
   } catch (err) {
+    console.error('Error updating auction:', err.message);
     return res.status(400).json({ error: err.message });
   }
 };
@@ -443,15 +449,15 @@ export const getLatestAuctionsForHomePage = async (req, res) => {
       .populate('seller', 'username')
       .sort('-createdAt')
       .limit(10); // Limit to 10 latest auctions
-      return res.status(200).json({
-        status: true,
-        message: 'Latest auctions retrieved successfully',
-        results: auctions.length,
-        data: auctions
-      });
+    return res.status(200).json({
+      status: true,
+      message: 'Latest auctions retrieved successfully',
+      results: auctions.length,
+      data: auctions
+    });
   }
   catch (err) {
     console.error('Error in getLatestAuctionsForHomePage:', err.message);
     return res.status(500).json({ status: false, message: err.message });
   }
-  };
+};
