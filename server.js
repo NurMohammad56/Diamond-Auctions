@@ -11,20 +11,20 @@ import dbconfig from "./src/configs/db.configs.js";
 // Load env vars
 dotenv.config({ path: "./.env" });
 // Allowed CORS origins
-const allowedOrigins = ["http://localhost:3000", "http://localhost:5100"];
+// const allowedOrigins = ["http://localhost:3000", "http://localhost:5100"];
 // Initialize express app
 const app = express();
 const httpServer = createServer(app);
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: process.env.ALLOWORIGIN,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 // Middlewares
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({ origin: process.env.ALLOWORIGIN, credentials: true }));
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
