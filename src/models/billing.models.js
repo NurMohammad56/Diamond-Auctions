@@ -1,5 +1,11 @@
 import mongoose, {Schema} from "mongoose";
-const billingSchema = new Schema({
+const billingSchema = new Schema(
+  {
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
   fullName: {
     type: String,
     required: true,
