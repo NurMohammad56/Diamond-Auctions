@@ -35,8 +35,13 @@ export const getBillings = async (req, res) => {
     }
 
     const billings = await Billing.find({ user: userId })
-      .populate("user", "username email") // Populate user details
+      .populate("user", "username email") 
+      .populate("auction", "title currentBid")
       .sort({ createdAt: -1 });
+
+    if (billings.length === 0) {
+      return res.status(404).json({ status: false, message: "No billing information found" });
+    }
 
     res.status(200).json({ status: true, data: billings });
   } catch (error) {

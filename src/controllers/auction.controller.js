@@ -77,6 +77,34 @@ export const getAllAuctions = async (req, res) => {
   }
 };
 
+// Get all auctions for a specific seller
+export const getAllAuctionsBySeller = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    const auctions = await Auction.find({ seller: sellerId })
+      .populate('seller', 'username')
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(limit);
+    const totalAuctions = await Auction.countDocuments({ seller: sellerId });
+    return res.status(200).json({
+      status: 'success',
+      message: 'Auctions retrieved successfully',
+      results: auctions.length,
+      total: totalAuctions,
+      page,
+      totalPages: Math.ceil(totalAuctions / limit),
+      data: auctions
+    });
+  }
+  catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 // Get a single auction
 export const getAuction = async (req, res) => {
   try {
