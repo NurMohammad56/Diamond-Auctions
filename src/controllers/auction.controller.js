@@ -49,19 +49,61 @@ export const createAuctionData = async (req, res) => {
 };
 
 // Get all auctions with pagination
+// export const getAllAuctions = async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = parseInt(req.query.limit, 10) || 10;
+//     const status = req.query.status
+//     const skip = (page - 1) * limit;
+
+//     const auctions = await Auction.find()
+//       .populate('seller', 'username')
+//       .sort('-createdAt')
+//       .skip(skip)
+//       .limit(limit);
+
+//     const totalAuctions = await Auction.countDocuments();
+
+//     return res.status(200).json({
+//       status: 'success',
+//       message: 'Auctions retrieved successfully',
+//       results: auctions.length,
+//       total: totalAuctions,
+//       page,
+//       totalPages: Math.ceil(totalAuctions / limit),
+//       data: auctions
+//     });
+//   } catch (err) {
+//     return res.status(400).json({ error: err.message });
+//   }
+// };
+
+// Get all auctions with pagination
 export const getAllAuctions = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
+    const status = req.query.status;
     const skip = (page - 1) * limit;
 
-    const auctions = await Auction.find()
+    // Create filter object
+    const filter = {};
+    
+    // If status is 'active', exclude cancelled auctions
+    if (status === 'active') {
+      filter.status = { $ne: 'cancelled' };
+    } else if (status) {
+      // If any other status is specified, filter by that status
+      filter.status = status;
+    }
+
+    const auctions = await Auction.find(filter)
       .populate('seller', 'username')
       .sort('-createdAt')
       .skip(skip)
       .limit(limit);
 
-    const totalAuctions = await Auction.countDocuments();
+    const totalAuctions = await Auction.countDocuments(filter);
 
     return res.status(200).json({
       status: 'success',
@@ -76,6 +118,7 @@ export const getAllAuctions = async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 };
+
 
 // Get all auctions for a specific seller
 export const getAllAuctionsBySeller = async (req, res) => {
