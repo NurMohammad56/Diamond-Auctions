@@ -48,60 +48,106 @@ export const createAuctionData = async (req, res) => {
   }
 };
 
-// Get all auctions with pagination
-// export const getAllAuctions = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = parseInt(req.query.limit, 10) || 10;
-//     const status = req.query.status
-//     const skip = (page - 1) * limit;
-
-//     const auctions = await Auction.find()
-//       .populate('seller', 'username')
-//       .sort('-createdAt')
-//       .skip(skip)
-//       .limit(limit);
-
-//     const totalAuctions = await Auction.countDocuments();
-
-//     return res.status(200).json({
-//       status: 'success',
-//       message: 'Auctions retrieved successfully',
-//       results: auctions.length,
-//       total: totalAuctions,
-//       page,
-//       totalPages: Math.ceil(totalAuctions / limit),
-//       data: auctions
-//     });
-//   } catch (err) {
-//     return res.status(400).json({ error: err.message });
-//   }
-// };
-
-// Get all auctions with pagination
+// Get all auctions with pagination and advanced filtering
 export const getAllAuctions = async (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const status = req.query.status;
-    const skip = (page - 1) * limit;
-
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      category, 
+      caratWeight, 
+      timeRange, 
+      typeOfSales, 
+      searchQuery 
+    } = req.query;
+    
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    
     // Create filter object
     const filter = {};
     
-    // If status is 'active', exclude cancelled auctions
+    // Status filtering
     if (status === 'active') {
       filter.status = { $ne: 'cancelled' };
     } else if (status) {
-      // If any other status is specified, filter by that status
       filter.status = status;
+    }
+    
+    // Category filtering
+    if (category) {
+      const categoryNames = category.trim();
+      const categoryDocs = await Category.find({ name: { $in: categoryNames } });
+
+      if (categoryDocs.length === 0) {
+        return res.status(404).json({ status: false, message: 'No matching categories found' });
+      }
+
+      const categoryIds = categoryDocs.map(cat => cat._id);
+      filter.category = { $in: categoryIds };
+    }
+
+    // Carat weight filtering
+    if (caratWeight) {
+      const ranges = {
+        'under-0.50': { $lt: 0.5 },
+        '0.50-1.00': { $gte: 0.5, $lt: 1.0 },
+        '1.00-2.00': { $gte: 1.0, $lt: 2.0 },
+        '2.00-3.00': { $gte: 2.0, $lt: 3.0 },
+        '3.00-plus': { $gte: 3.0 }
+      };
+      filter.caratWeight = ranges[caratWeight];
+    }
+
+    // Time range filtering
+    if (timeRange) {
+      const now = new Date();
+      const dateRanges = {
+        'today': { $gte: new Date(now.setHours(0, 0, 0, 0)) },
+        'yesterday': {
+          $gte: new Date(new Date().setDate(now.getDate() - 1)),
+          $lt: new Date(now.setHours(0, 0, 0, 0))
+        },
+        'last-7-days': { $gte: new Date(now.setDate(now.getDate() - 7)) },
+        'last-30-days': { $gte: new Date(now.setDate(now.getDate() - 30)) }
+      };
+      filter.createdAt = dateRanges[timeRange];
+    }
+
+    // Type of sales filtering
+    if (typeOfSales) {
+      switch (typeOfSales) {
+        case 'upcoming':
+          filter.status = 'upcoming';
+          filter.startTime = { $gt: new Date() };
+          break;
+        case 'latest':
+          filter.status = 'live';
+          filter.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+          break;
+        case 'live-auction':
+          filter.status = 'live';
+          break;
+        case 'popular':
+          filter.bidCount = { $gt: 5 };
+          break;
+        case 'highest-bidding':
+          filter.currentBid = { $gt: 10000 };
+          break;
+      }
+    }
+
+    // Text search
+    if (searchQuery) {
+      filter.$text = { $search: searchQuery };
     }
 
     const auctions = await Auction.find(filter)
       .populate('seller', 'username')
+      .populate('category', 'name')
       .sort('-createdAt')
       .skip(skip)
-      .limit(limit);
+      .limit(parseInt(limit, 10));
 
     const totalAuctions = await Auction.countDocuments(filter);
 
@@ -110,15 +156,15 @@ export const getAllAuctions = async (req, res) => {
       message: 'Auctions retrieved successfully',
       results: auctions.length,
       total: totalAuctions,
-      page,
-      totalPages: Math.ceil(totalAuctions / limit),
+      page: parseInt(page, 10),
+      totalPages: Math.ceil(totalAuctions / parseInt(limit, 10)),
       data: auctions
     });
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    console.error('Error in getAllAuctions:', err.message);
+    return res.status(400).json({ status: false, error: err.message });
   }
 };
-
 
 // Get all auctions for a specific seller
 export const getAllAuctionsBySeller = async (req, res) => {
@@ -240,91 +286,91 @@ export const deleteAuction = async (req, res) => {
 };
 
 // Search auctions
-export const searchAuctions = async (req, res) => {
-  try {
-    const { category, caratWeight, timeRange, typeOfSales, searchQuery } = req.query;
-    const filter = {};
+// export const searchAuctions = async (req, res) => {
+//   try {
+//     const { category, caratWeight, timeRange, typeOfSales, searchQuery } = req.query;
+//     const filter = {};
 
-    if (category) {
-      const categoryNames = category.trim();
-      const categoryDocs = await Category.find({ name: { $in: categoryNames } });
+//     if (category) {
+//       const categoryNames = category.trim();
+//       const categoryDocs = await Category.find({ name: { $in: categoryNames } });
 
-      if (categoryDocs.length === 0) {
-        return res.status(404).json({ status: false, message: 'No matching categories found' });
-      }
+//       if (categoryDocs.length === 0) {
+//         return res.status(404).json({ status: false, message: 'No matching categories found' });
+//       }
 
-      const categoryIds = categoryDocs.map(cat => cat._id);
-      filter.category = { $in: categoryIds };
-    }
+//       const categoryIds = categoryDocs.map(cat => cat._id);
+//       filter.category = { $in: categoryIds };
+//     }
 
-    if (caratWeight) {
-      const ranges = {
-        'under-0.50': { $lt: 0.5 },
-        '0.50-1.00': { $gte: 0.5, $lt: 1.0 },
-        '1.00-2.00': { $gte: 1.0, $lt: 2.0 },
-        '2.00-3.00': { $gte: 2.0, $lt: 3.0 },
-        '3.00-plus': { $gte: 3.0 }
-      };
-      filter.caratWeight = ranges[caratWeight];
-    }
+//     if (caratWeight) {
+//       const ranges = {
+//         'under-0.50': { $lt: 0.5 },
+//         '0.50-1.00': { $gte: 0.5, $lt: 1.0 },
+//         '1.00-2.00': { $gte: 1.0, $lt: 2.0 },
+//         '2.00-3.00': { $gte: 2.0, $lt: 3.0 },
+//         '3.00-plus': { $gte: 3.0 }
+//       };
+//       filter.caratWeight = ranges[caratWeight];
+//     }
 
-    if (timeRange) {
-      const now = new Date();
-      const dateRanges = {
-        'today': { $gte: new Date(now.setHours(0, 0, 0, 0)) },
-        'yesterday': {
-          $gte: new Date(new Date().setDate(now.getDate() - 1)),
-          $lt: new Date(now.setHours(0, 0, 0, 0))
-        },
-        'last-7-days': { $gte: new Date(now.setDate(now.getDate() - 7)) },
-        'last-30-days': { $gte: new Date(now.setDate(now.getDate() - 30)) }
-      };
-      filter.createdAt = dateRanges[timeRange];
-    }
+//     if (timeRange) {
+//       const now = new Date();
+//       const dateRanges = {
+//         'today': { $gte: new Date(now.setHours(0, 0, 0, 0)) },
+//         'yesterday': {
+//           $gte: new Date(new Date().setDate(now.getDate() - 1)),
+//           $lt: new Date(now.setHours(0, 0, 0, 0))
+//         },
+//         'last-7-days': { $gte: new Date(now.setDate(now.getDate() - 7)) },
+//         'last-30-days': { $gte: new Date(now.setDate(now.getDate() - 30)) }
+//       };
+//       filter.createdAt = dateRanges[timeRange];
+//     }
 
-    if (typeOfSales) {
-      switch (typeOfSales) {
-        case 'upcoming':
-          filter.status = 'upcoming';
-          filter.startTime = { $gt: new Date() };
-          break;
-        case 'latest':
-          filter.status = 'live';
-          filter.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
-          break;
-        case 'live-auction':
-          filter.status = 'live';
-          break;
-        case 'popular':
-          filter.bidCount = { $gt: 5 };
-          break;
-        case 'highest-bidding':
-          filter.currentBid = { $gt: 10000 };
-          break;
-      }
-    }
+//     if (typeOfSales) {
+//       switch (typeOfSales) {
+//         case 'upcoming':
+//           filter.status = 'upcoming';
+//           filter.startTime = { $gt: new Date() };
+//           break;
+//         case 'latest':
+//           filter.status = 'live';
+//           filter.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+//           break;
+//         case 'live-auction':
+//           filter.status = 'live';
+//           break;
+//         case 'popular':
+//           filter.bidCount = { $gt: 5 };
+//           break;
+//         case 'highest-bidding':
+//           filter.currentBid = { $gt: 10000 };
+//           break;
+//       }
+//     }
 
-    if (searchQuery) {
-      filter.$text = { $search: searchQuery };
-    }
+//     if (searchQuery) {
+//       filter.$text = { $search: searchQuery };
+//     }
 
-    const auctions = await Auction.find(filter)
-      .sort('-createdAt')
-      .populate('category', 'name')
-      .populate('seller', 'username');
+//     const auctions = await Auction.find(filter)
+//       .sort('-createdAt')
+//       .populate('category', 'name')
+//       .populate('seller', 'username');
 
-    return res.status(200).json({
-      status: true,
-      message: 'Success',
-      results: auctions.length,
-      data: auctions
-    });
+//     return res.status(200).json({
+//       status: true,
+//       message: 'Success',
+//       results: auctions.length,
+//       data: auctions
+//     });
 
-  } catch (err) {
-    console.error('Error in searchAuctions:', err.message);
-    return res.status(500).json({ status: false, message: 'Server error' });
-  }
-};
+//   } catch (err) {
+//     console.error('Error in searchAuctions:', err.message);
+//     return res.status(500).json({ status: false, message: 'Server error' });
+//   }
+// };
 
 // Get all related auction for same category
 export const getRelatedAuctions = async (req, res) => {
