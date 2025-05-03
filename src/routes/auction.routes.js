@@ -5,7 +5,7 @@ import {
     getAuction,
     updateAuction,
     deleteAuction,
-    searchAuctions,
+
     getRelatedAuctions,
     getSellerMatrics,
     getLiveAuctionsForHomePage,
@@ -30,7 +30,6 @@ router.get("/get-live-auctions", getLiveAuctionsForHomePage);
 router.get("/get-latest-auctions", getLatestAuctionsForHomePage);
 router.get("/get-seller-statistics", verifyJWT, getSellerMatrics);
 router.get("/get-auction/:id",  getAuction);
-router.get('/search', searchAuctions);
 router.get('/related-auctions', getRelatedAuctions);
 router.get('/:auctionId/result', getAuctionResult);
 
