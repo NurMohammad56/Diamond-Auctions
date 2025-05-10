@@ -2,17 +2,18 @@
 node_modules/
 
 # Environment variables
-
+.env
 
 # Logs
 *.log
 
-# Compiled TypeScript
+# Compiled 
 dist/
 
 # IDE settings
 .vscode/
-
+# Ensure .env files are ignored
+.env.*
 # OS-specific files
 .DS_Store
 Thumbs.db
