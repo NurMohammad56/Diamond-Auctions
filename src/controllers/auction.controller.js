@@ -174,11 +174,15 @@ export const getAllAuctionsBySeller = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
     const auctions = await Auction.find({ seller: sellerId })
-      .populate('seller', 'username')
+      .populate('seller category', 'username name')
       .sort('-createdAt')
       .skip(skip)
       .limit(limit);
-    const totalAuctions = await Auction.countDocuments({ seller: sellerId });
+
+
+    const totalAuctions = await Auction.countDocuments({ seller: sellerId })
+
+
     return res.status(200).json({
       status: 'success',
       message: 'Auctions retrieved successfully',
