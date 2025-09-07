@@ -1,1 +1,2 @@
-﻿# Froked from my company github. I am done this project as developer of my company github profile.
+﻿# I worked on this project as a developer under my company’s GitHub profile (forked from the company repository).
+
